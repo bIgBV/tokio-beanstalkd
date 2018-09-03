@@ -1,0 +1,10 @@
+[package]
+name = "tokio-beanstalkd"
+version = "0.1.0"
+authors = ["Bhargav Voleti <bhargav.voleti93@gmail.com>"]
+
+[dependencies]
+tokio = "0.1"
+futures = "0.1"
+failure = "0.1"
+bytes = "0.4"
