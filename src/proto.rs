@@ -91,7 +91,7 @@ fn utf8(buf: &[u8]) -> Result<&str, io::Error> {
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Unable to decode input as UTF8"))
 }
 
-fn parse_response(list: &[&str]) -> Result<Response, failure::Error> {
+fn parse_response(list: Vec<&str>) -> Result<Response, failure::Error> {
     if list.len() == 1 {
         return match list[0] {
             "OUT_OF_MEMORY" => Ok(Response::OutOfMemory),
@@ -124,14 +124,27 @@ impl Decoder for CommandCodec {
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         if let Some(carriage_offset) = src[self.outstart..].iter().position(|b| *b == b'\r') {
-            let iter = src.iter().skip(carriage_offset).peekable();
-            if let Some(val) = iter.peek() {
-                if **val == b'\n' {
-                    let delimitter_offset = carriage_offset + 1;
-                    let line = utf8(&src.split_to(self.outstart + delimitter_offset))?;
+            let delimitter_offset: Option<usize> = {
+                if let Some(val) = src.iter_mut().skip(carriage_offset).peekable().peek() {
+                    if **val == b'\n' {
+                        let delimitter_offset = carriage_offset + 1;
+                        Some(delimitter_offset)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            };
+
+            match delimitter_offset {
+                Some(v) => {
+                    let line = src.split_to(self.outstart + v);
+                    let line = utf8(&line)?;
                     let line = line.trim().split(" ").collect();
                     return Ok(Some(parse_response(line)?));
-                } else {
+                }
+                None => {
                     self.outstart = src.len();
                     return Ok(None);
                 }
@@ -140,7 +153,5 @@ impl Decoder for CommandCodec {
             self.outstart = src.len();
             return Ok(None);
         }
-
-        Ok(None)
     }
 }

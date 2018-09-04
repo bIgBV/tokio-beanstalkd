@@ -1,7 +1,6 @@
-extern crate failure;
-#[macro_use]
-extern crate futures;
 extern crate bytes;
+extern crate failure;
+extern crate futures;
 extern crate tokio;
 
 mod proto;
@@ -25,7 +24,7 @@ where
     ) -> impl Future<Item = Beanstalkd<tokio::net::TcpStream>, Error = failure::Error> {
         tokio::net::TcpStream::connect(addr)
             .map_err(failure::Error::from)
-            .and_then(|stream| Beanstalkd::setup(stream))
+            .map(|stream| Beanstalkd::setup(stream))
     }
 
     fn setup(stream: S) -> Self {
@@ -40,6 +39,8 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let bean = tokio::run(Beanstalkd::connect("127.0.0.1:11300".parse().unwrap()));
+        let bean =
+            tokio::run(Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()).map(|bean| bean));
+        assert!(bean);
     }
 }
