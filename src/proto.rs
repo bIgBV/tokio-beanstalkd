@@ -110,12 +110,12 @@ fn parse_response(list: Vec<&str>) -> Result<Response, failure::Error> {
         return match list[0] {
             "INSERTED" => Ok(Response::Inserted(id)),
             "BURIED" => Ok(Response::Buried(id)),
-            _ => Err("Unknown resonse from server"),
+            _ => bail!("Unknown resonse from server"),
         };
     }
     // TODO Consumer commands
     //
-    bail("Unable to parse response")
+    bail!("Unable to parse response")
 }
 
 impl Decoder for CommandCodec {
