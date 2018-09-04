@@ -101,7 +101,7 @@ fn parse_response(list: Vec<&str>) -> Result<Response, failure::Error> {
             "EXPECTED_CRLF" => Ok(Response::ExpectedCLRF),
             "JOB_TOO_BIG" => Ok(Response::JobTooBig),
             "DRAINING" => Ok(Response::Draining),
-            _ => Err(unimplemented!()),
+            _ => bail!("Unknown response from server"),
         };
     }
 
@@ -110,12 +110,12 @@ fn parse_response(list: Vec<&str>) -> Result<Response, failure::Error> {
         return match list[0] {
             "INSERTED" => Ok(Response::Inserted(id)),
             "BURIED" => Ok(Response::Buried(id)),
-            _ => Err(unimplemented!()),
+            _ => Err("Unknown resonse from server"),
         };
     }
     // TODO Consumer commands
     //
-    Err(unimplemented!())
+    bail("Unable to parse response")
 }
 
 impl Decoder for CommandCodec {
