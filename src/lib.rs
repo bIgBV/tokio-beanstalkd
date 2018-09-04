@@ -6,8 +6,6 @@ extern crate tokio;
 
 mod proto;
 
-use proto::Packetizer;
-
 use failure::ResultExt;
 use tokio::codec::Framed;
 use tokio::prelude::*;
@@ -15,18 +13,24 @@ use tokio::prelude::*;
 use std::net::SocketAddr;
 
 pub struct Beanstalkd<S> {
-    connection: Framed<S, Packetizer>,
+    connection: Framed<S, proto::CommandCodec>,
 }
 
-impl<S> Beanstalkd<S> {
-    pub fn connect(addr: &SocketAddr) -> impl Future<Item = Self, Error = failure::Error> {
+impl<S> Beanstalkd<S>
+where
+    S: AsyncRead + AsyncWrite,
+{
+    pub fn connect(
+        addr: &SocketAddr,
+    ) -> impl Future<Item = Beanstalkd<tokio::net::TcpStream>, Error = failure::Error> {
         tokio::net::TcpStream::connect(addr)
             .map_err(failure::Error::from)
-            .and_then(move |stream| {
-                let bean = Framed::new(stream, Packetizer::new());
+            .and_then(|stream| Beanstalkd::setup(stream))
+    }
 
-                Beanstalkd { connection: bean }
-            })
+    fn setup(stream: S) -> Self {
+        let bean = Framed::new(stream, proto::CommandCodec::new());
+        Beanstalkd { connection: bean }
     }
 }
 

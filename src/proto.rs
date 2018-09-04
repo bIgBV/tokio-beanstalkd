@@ -5,16 +5,17 @@ use tokio::prelude::*;
 
 use std::fmt::{self, Debug, Display};
 use std::io;
+use std::str;
 use std::str::FromStr;
 
-pub(crate) struct Packetizer {
+pub(crate) struct CommandCodec {
     /// Prefix of outbox that has been sent
     outstart: usize,
 }
 
-impl Packetizer {
-    pub(crate) fn new() -> Packetizer {
-        Packetizer { outstart: 0 }
+impl CommandCodec {
+    pub(crate) fn new() -> CommandCodec {
+        CommandCodec { outstart: 0 }
     }
 }
 
@@ -56,12 +57,12 @@ impl Display for Response {
     }
 }
 
-impl Encoder for Packetizer {
+impl Encoder for CommandCodec {
     type Item = Request;
     type Error = failure::Error;
 
     fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        match *self {
+        match item {
             Request::Put {
                 priority,
                 delay,
@@ -79,6 +80,7 @@ impl Encoder for Packetizer {
 
                 dst.reserve(foramt_string.len());
                 dst.put(foramt_string.as_bytes());
+                Ok(())
             }
         }
     }
@@ -91,31 +93,32 @@ fn utf8(buf: &[u8]) -> Result<&str, io::Error> {
 
 fn parse_response(list: &[&str]) -> Result<Response, failure::Error> {
     if list.len() == 1 {
-        return match **list[0] {
-            "OUT_OF_MEMORY" => Response::OutOfMemory,
-            "INTERNAL_ERROR" => Response::InternalError,
-            "BAD_FORMAT" => Response::BadFormat,
-            "UNKNOWN_COMMAND" => Response::UnknownCommand,
-            "EXPECTED_CRLF" => Response::ExpectedCLRF,
-            "JOB_TOO_BIG" => Response::JobTooBig,
-            "DRAINING" => Response::Draining,
+        return match list[0] {
+            "OUT_OF_MEMORY" => Ok(Response::OutOfMemory),
+            "INTERNAL_ERROR" => Ok(Response::InternalError),
+            "BAD_FORMAT" => Ok(Response::BadFormat),
+            "UNKNOWN_COMMAND" => Ok(Response::UnknownCommand),
+            "EXPECTED_CRLF" => Ok(Response::ExpectedCLRF),
+            "JOB_TOO_BIG" => Ok(Response::JobTooBig),
+            "DRAINING" => Ok(Response::Draining),
             _ => Err(unimplemented!()),
         };
     }
 
     if list.len() == 2 {
-        let id = FromStr::from_str::<u64>(**list[1]);
-        return match **list[0] {
-            "INSERTED" => Response::Inserted(id),
-            "BURIED" => Response::Buried(id),
+        let id = FromStr::from_str(list[1])?;
+        return match list[0] {
+            "INSERTED" => Ok(Response::Inserted(id)),
+            "BURIED" => Ok(Response::Buried(id)),
             _ => Err(unimplemented!()),
         };
     }
-
     // TODO Consumer commands
+    //
+    Err(unimplemented!())
 }
 
-impl Decoder for Packetizer {
+impl Decoder for CommandCodec {
     type Item = Response;
     type Error = failure::Error;
 
@@ -125,7 +128,7 @@ impl Decoder for Packetizer {
             if let Some(val) = iter.peek() {
                 if **val == b'\n' {
                     let delimitter_offset = carriage_offset + 1;
-                    let line = utf8(src.split_to(self.outstart + delimitter_offset))?;
+                    let line = utf8(&src.split_to(self.outstart + delimitter_offset))?;
                     let line = line.trim().split(" ").collect();
                     return Ok(Some(parse_response(line)?));
                 } else {
@@ -135,7 +138,9 @@ impl Decoder for Packetizer {
             }
         } else {
             self.outstart = src.len();
-            Ok(None)
+            return Ok(None);
         }
+
+        Ok(None)
     }
 }
