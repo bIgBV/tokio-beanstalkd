@@ -30,7 +30,7 @@ pub(crate) enum Request {
 
 pub type Tube = String;
 
-pub type Id = u64;
+pub type Id = u32;
 
 #[derive(Debug)]
 pub(crate) enum Response {

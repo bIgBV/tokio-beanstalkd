@@ -43,7 +43,7 @@ impl Beanstalkd {
                 data,
             })
             .into_future()
-            .and_then(|(r, conn)| match r {
+            .map(|(r, _)| match r {
                 Some(proto::Response::Inserted(id)) => Some(id),
                 _ => None,
             })
