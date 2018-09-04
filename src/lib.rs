@@ -11,23 +11,18 @@ use tokio::prelude::*;
 
 use std::net::SocketAddr;
 
-pub struct Beanstalkd<S> {
-    connection: Framed<S, proto::CommandCodec>,
+pub struct Beanstalkd {
+    connection: Framed<tokio::net::TcpStream, proto::CommandCodec>,
 }
 
-impl<S> Beanstalkd<S>
-where
-    S: AsyncRead + AsyncWrite,
-{
-    pub fn connect(
-        addr: &SocketAddr,
-    ) -> impl Future<Item = Beanstalkd<tokio::net::TcpStream>, Error = failure::Error> {
+impl Beanstalkd {
+    pub fn connect(addr: &SocketAddr) -> impl Future<Item = Self, Error = failure::Error> {
         tokio::net::TcpStream::connect(addr)
             .map_err(failure::Error::from)
             .map(|stream| Beanstalkd::setup(stream))
     }
 
-    fn setup(stream: S) -> Self {
+    fn setup(stream: tokio::net::TcpStream) -> Self {
         let bean = Framed::new(stream, proto::CommandCodec::new());
         Beanstalkd { connection: bean }
     }
@@ -39,8 +34,9 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let bean =
-            tokio::run(Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()).map(|bean| bean));
-        assert!(bean);
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let bean = rt.block_on(Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()));
+        drop(bean);
+        rt.shutdown_on_idle();
     }
 }
