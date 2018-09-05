@@ -42,6 +42,7 @@ impl Beanstalkd {
                 ttr,
                 data,
             })
+        // TODO proper error handling
             .and_then(|conn| {
                 conn.into_future().then(|val| match val {
                     Ok((Some(val), conn)) => Ok((Beanstalkd { connection: conn }, Ok(val))),
@@ -66,8 +67,8 @@ mod tests {
             Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()).and_then(|bean| {
                 // Let put a job in
                 bean.put(0, 1, 1, "data")
-                    .inspect(|(bean, response)| assert!(response.is_ok()))
-                    .and_then(|(bean, response)| {
+                    .inspect(|(_, response)| assert!(response.is_ok()))
+                    .and_then(|(bean, _)| {
                         // How about another one?
                         bean.put(0, 1, 1, "more data")
                     })

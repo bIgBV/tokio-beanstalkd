@@ -128,20 +128,16 @@ impl Decoder for CommandCodec {
         if let Some(carriage_offset) = src[self.outstart..].iter().position(|b| *b == b'\r') {
             if src[carriage_offset + 1] == b'\n' {
                 // Afterwards src contains elements [at, len), and the returned BytesMut
-                // contains elements [0, at)
+                // contains elements [0, at), so + 1 for \r and then +1 for \n
                 let line = src.split_to(self.outstart + carriage_offset + 1 + 1);
                 let line = utf8(&line)?;
                 let line = line.trim().split(" ").collect();
                 self.outstart = 0;
 
                 return Ok(Some(parse_response(line)?));
-            } else {
-                self.outstart += src.len();
-                return Ok(None);
             }
-        } else {
-            self.outstart = src.len();
-            return Ok(None);
         }
+        self.outstart = src.len();
+        return Ok(None);
     }
 }
