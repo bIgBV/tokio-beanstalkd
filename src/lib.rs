@@ -33,31 +33,25 @@ impl Beanstalkd {
         priority: u32,
         delay: u32,
         ttr: u32,
-        data: &str,
-    ) -> impl Future<Item = (Self, Option<u32>), Error = failure::Error> {
-        let (sink, stream) = self.connection.split();
+        data: &'static str,
+    ) -> impl Future<Item = (Self, Result<proto::Response, failure::Error>), Error = failure::Error>
+    {
+        self.connection
+            .send(proto::Request::Put {
+                priority,
+                delay,
+                ttr,
+                data,
+            })
+            .and_then(move |conn| {
+                let fut = conn.into_future();
 
-        let sent_fut = sink.send(proto::Request::Put {
-            priority,
-            delay,
-            ttr,
-            data,
-        });
-
-        let value = sent_fut.and_then(|conn| {
-            stream.into_future();
-        });
-
-        let value = value.map(|(r, conn)| {
-            let id = match r {
-                Some(proto::Response::Inserted(id)) => (self, Some(id)),
-                _ => (self, None),
-            };
-
-            id
-        });
-
-        value
+                fut.then(|val| match val {
+                    Ok((Some(val), conn)) => Ok(Ok(val)),
+                    Ok((None, _)) | Err(_) => bail!("Unable to read from stream"),
+                })
+            })
+            .map(move |r| (self, r))
     }
 }
 

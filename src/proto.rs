@@ -34,7 +34,7 @@ pub type Tube = String;
 pub type Id = u32;
 
 #[derive(Debug)]
-pub(crate) enum Response {
+pub enum Response {
     OK,
     Reserved,
     Inserted(Id),
