@@ -34,8 +34,7 @@ impl Beanstalkd {
         delay: u32,
         ttr: u32,
         data: &'static str,
-    ) -> impl Future<Item = (Self, Result<proto::Response, failure::Error>), Error = failure::Error>
-    {
+    ) -> impl Future<Item = Result<proto::Response, failure::Error>, Error = failure::Error> {
         self.connection
             .send(proto::Request::Put {
                 priority,
@@ -43,7 +42,7 @@ impl Beanstalkd {
                 ttr,
                 data,
             })
-            .and_then(move |conn| {
+            .and_then(|conn| {
                 let fut = conn.into_future();
 
                 fut.then(|val| match val {
@@ -51,7 +50,7 @@ impl Beanstalkd {
                     Ok((None, _)) | Err(_) => bail!("Unable to read from stream"),
                 })
             })
-            .map(move |r| (self, r))
+            .map(|r| r)
     }
 }
 
@@ -64,8 +63,8 @@ mod tests {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         let bean = rt.block_on(
             Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()).and_then(|bean| {
-                bean.put(1, 0, 10, "data")
-                    .inspect(|(bean, response)| eprintln!("created {}", response))
+                bean.put(0, 1, 1, "data")
+                    .inspect(|response| assert!(response.is_ok()))
             }),
         );
         assert!(!bean.is_err());
