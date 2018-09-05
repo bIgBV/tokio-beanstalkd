@@ -35,7 +35,9 @@ impl Beanstalkd {
         ttr: u32,
         data: &str,
     ) -> impl Future<Item = (Self, Option<u32>), Error = failure::Error> {
-        let sent_fut = self.connection.send(proto::Request::Put {
+        let (sink, stream) = self.connection.split();
+
+        let sent_fut = sink.send(proto::Request::Put {
             priority,
             delay,
             ttr,
@@ -43,7 +45,7 @@ impl Beanstalkd {
         });
 
         let value = sent_fut.and_then(|conn| {
-            conn.into_future();
+            stream.into_future();
         });
 
         let value = value.map(|(r, conn)| {
