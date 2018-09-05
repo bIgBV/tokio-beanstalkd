@@ -79,7 +79,6 @@ impl Encoder for CommandCodec {
                     data = data
                 );
 
-                eprintln!("Encoding: {:?}", foramt_string);
                 dst.reserve(foramt_string.len());
                 dst.put(foramt_string.as_bytes());
                 Ok(())
@@ -125,28 +124,21 @@ impl Decoder for CommandCodec {
     type Error = failure::Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        eprintln!("Decoding: {:?}, counter: {}", src, self.outstart);
         if let Some(carriage_offset) = src[self.outstart..].iter().position(|b| *b == b'\r') {
-            eprintln!(
-                "Found \\r, position: {}, counter: {}",
-                carriage_offset, self.outstart,
-            );
-            eprintln!("Next char: {}", src[carriage_offset + 1]);
             if src[carriage_offset + 1] == b'\n' {
-                let line = src.split_to(self.outstart + carriage_offset + 1);
+                // Afterwards src contains elements [at, len), and the returned BytesMut
+                // contains elements [0, at)
+                let line = src.split_to(self.outstart + carriage_offset + 1 + 1);
                 let line = utf8(&line)?;
                 let line = line.trim().split(" ").collect();
                 self.outstart = 0;
-                src.clear();
-                eprintln!("Decoded: {:?}, counter: {}", src, self.outstart);
+
                 return Ok(Some(parse_response(line)?));
             } else {
-                eprintln!("Early return, no \\n, couter: {}", self.outstart);
                 self.outstart += src.len();
                 return Ok(None);
             }
         } else {
-            eprintln!("Early return, no \\r, couter: {}", self.outstart);
             self.outstart = src.len();
             return Ok(None);
         }

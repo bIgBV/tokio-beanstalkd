@@ -72,13 +72,9 @@ mod tests {
                     .inspect(|(bean, response)| assert!(response.is_ok()))
                     .and_then(|(bean, response)| {
                         // How about another one?
-                        eprintln!("Putting another job");
                         bean.put(0, 1, 1, "more data")
                     })
-                    .inspect(|(_, response)| {
-                        eprintln!("Inspecting the result");
-                        assert!(response.is_ok())
-                    })
+                    .inspect(|(_, response)| assert!(response.is_ok()))
             }),
         );
         assert!(!bean.is_err());
