@@ -35,19 +35,27 @@ impl Beanstalkd {
         ttr: u32,
         data: &str,
     ) -> impl Future<Item = (Self, Option<u32>), Error = failure::Error> {
-        self.connection
-            .send(proto::Request::Put {
-                priority,
-                delay,
-                ttr,
-                data,
-            })
-            .into_future()
-            .map(|(r, _)| match r {
-                Some(proto::Response::Inserted(id)) => Some(id),
-                _ => None,
-            })
-            .map(move |r| (self, r))
+        let sent_fut = self.connection.send(proto::Request::Put {
+            priority,
+            delay,
+            ttr,
+            data,
+        });
+
+        let value = sent_fut.and_then(|conn| {
+            conn.into_future();
+        });
+
+        let value = value.map(|(r, conn)| {
+            let id = match r {
+                Some(proto::Response::Inserted(id)) => (self, Some(id)),
+                _ => (self, None),
+            };
+
+            id
+        });
+
+        value
     }
 }
 

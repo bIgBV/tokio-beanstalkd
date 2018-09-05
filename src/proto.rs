@@ -19,6 +19,7 @@ impl CommandCodec {
     }
 }
 
+#[derive(Debug)]
 pub(crate) enum Request {
     Put {
         priority: u32,
