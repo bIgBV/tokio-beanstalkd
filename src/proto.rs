@@ -1,9 +1,8 @@
 use bytes::{BufMut, BytesMut};
 use failure;
 use tokio::codec::{Decoder, Encoder};
-use tokio::prelude::*;
 
-use std::fmt::{self, Debug, Display};
+use std::fmt::{self, Display};
 use std::io;
 use std::str;
 use std::str::FromStr;
@@ -50,6 +49,8 @@ pub enum Response {
     OutOfMemory,
     InternalError,
     UnknownCommand,
+
+    ConnectionClosed,
 }
 
 impl Display for Response {

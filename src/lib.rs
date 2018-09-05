@@ -6,7 +6,6 @@ extern crate tokio;
 
 mod proto;
 
-use failure::ResultExt;
 use tokio::codec::Framed;
 use tokio::prelude::*;
 
@@ -44,9 +43,7 @@ impl Beanstalkd {
                 data,
             })
             .and_then(|conn| {
-                let fut = conn.into_future();
-
-                fut.then(|val| match val {
+                conn.into_future().then(|val| match val {
                     Ok((Some(val), conn)) => Ok((Beanstalkd { connection: conn }, Ok(val))),
                     Ok((None, conn)) => Ok((
                         Beanstalkd { connection: conn },
