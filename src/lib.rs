@@ -46,10 +46,8 @@ impl Beanstalkd {
             .and_then(|conn| {
                 conn.into_future().then(|val| match val {
                     Ok((Some(val), conn)) => Ok((Beanstalkd { connection: conn }, Ok(val))),
-                    Ok((None, conn)) => Ok((
-                        Beanstalkd { connection: conn },
-                        Ok(proto::Response::BadFormat),
-                    )),
+                    // None is only returned when the stream is closed
+                    Ok((None, _)) => bail!("Stream closed"),
                     Err(_) => bail!("Something bad happened"),
                 })
             })

@@ -2,10 +2,15 @@ use bytes::{BufMut, BytesMut};
 use failure;
 use tokio::codec::{Decoder, Encoder};
 
-use std::fmt::{self, Display};
 use std::io;
 use std::str;
 use std::str::FromStr;
+
+mod request;
+mod response;
+
+pub(crate) use self::request::Request;
+pub(crate) use self::response::Response;
 
 pub(crate) struct CommandCodec {
     /// Prefix of outbox that has been sent
@@ -15,47 +20,6 @@ pub(crate) struct CommandCodec {
 impl CommandCodec {
     pub(crate) fn new() -> CommandCodec {
         CommandCodec { outstart: 0 }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) enum Request {
-    Put {
-        priority: u32,
-        delay: u32,
-        ttr: u32,
-        data: &'static str,
-    },
-}
-
-pub type Tube = String;
-
-pub type Id = u32;
-
-#[derive(Debug)]
-pub enum Response {
-    OK,
-    Reserved,
-    Inserted(Id),
-    Buried(Id),
-    Using(Tube),
-    Deleted,
-    Watching,
-    NotIgnored,
-    BadFormat,
-    ExpectedCLRF,
-    JobTooBig,
-    Draining,
-    OutOfMemory,
-    InternalError,
-    UnknownCommand,
-
-    ConnectionClosed,
-}
-
-impl Display for Response {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(self, f)
     }
 }
 
@@ -90,6 +54,7 @@ impl Encoder for CommandCodec {
 
 fn utf8(buf: &[u8]) -> Result<&str, io::Error> {
     str::from_utf8(buf)
+        // This should never happen since everything is ascii
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Unable to decode input as UTF8"))
 }
 
