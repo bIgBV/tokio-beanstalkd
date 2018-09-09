@@ -25,13 +25,11 @@ impl CommandCodec {
     fn parse_job(
         &mut self,
         src: &mut BytesMut,
-        offset: usize,
         pre: PreJob,
     ) -> Result<Option<Job>, failure::Error> {
-        if let Some(carriage_offset) = src[offset..].iter().position(|b| *b == b'\r') {
+        if let Some(carriage_offset) = src.iter().position(|b| *b == b'\r') {
             if src[carriage_offset + 1] == b'\n' {
-                let line = src.split_to(offset + carriage_offset + 2);
-                let line = utf8(&line)?;
+                let line = utf8(src)?;
                 let line: Vec<&str> = line.trim().split(" ").collect();
                 return Ok(Some(Job {
                     id: pre.id,
@@ -71,7 +69,7 @@ impl Encoder for CommandCodec {
                 Ok(())
             }
             Request::Reserve => {
-                let mut format_string = format!("reserve");
+                let mut format_string = format!("reserve\r\n");
                 dst.reserve(format_string.len());
                 dst.put(format_string.as_bytes());
                 Ok(())
@@ -121,8 +119,7 @@ fn parse_response(list: Vec<&str>) -> Result<Response, failure::Error> {
             _ => bail!("Unknown response from server."),
         };
     }
-    // TODO Consumer commands
-    //
+
     bail!("Unable to parse response")
 }
 
@@ -143,9 +140,10 @@ impl Decoder for CommandCodec {
                 let response = parse_response(line)?;
 
                 match response {
-                    Response::Pre(v) => {
-                        if let Some(job) = self.parse_job(src, offset, v)? {
+                    Response::Pre(pre) => {
+                        if let Some(job) = self.parse_job(src, pre)? {
                             self.outstart = 0;
+                            src.clear();
                             return Ok(Some(Response::Reserved(job)));
                         } else {
                             return Ok(None);
@@ -153,12 +151,14 @@ impl Decoder for CommandCodec {
                     }
                     _ => {
                         self.outstart = 0;
+                        src.clear();
                         return Ok(Some(response));
                     }
                 };
             }
         }
         self.outstart = src.len();
+        src.clear();
         return Ok(None);
     }
 }

@@ -84,7 +84,7 @@ mod tests {
                 bean.put(0, 1, 1, "data")
                     .inspect(|(_, response)| assert!(response.is_ok()))
                     .and_then(|(bean, _)| {
-                        // How about another one?
+                        // how about another one?
                         bean.put(0, 1, 1, "more data")
                     })
                     .inspect(|(_, response)| assert!(response.is_ok()))
@@ -109,7 +109,15 @@ mod tests {
                         }
                         _ => panic!("Wrong response received"),
                     })
+                    .and_then(|(bean, _)| {
+                        // how about another one?
+                        bean.put(0, 1, 1, "more data")
+                    })
+                    .inspect(|(_, response)| assert!(response.is_ok()))
             }),
         );
+        assert!(!bean.is_err());
+        drop(bean);
+        rt.shutdown_on_idle();
     }
 }
