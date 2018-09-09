@@ -6,4 +6,5 @@ pub(crate) enum Request {
         ttr: u32,
         data: &'static str,
     },
+    Reserve,
 }

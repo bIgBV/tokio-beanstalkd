@@ -5,9 +5,22 @@ pub type Tube = String;
 pub type Id = u32;
 
 #[derive(Debug)]
+pub struct PreJob {
+    pub id: Id,
+    pub bytes: usize,
+}
+
+#[derive(Debug)]
+pub struct Job {
+    pub id: Id,
+    pub bytes: usize,
+    pub data: String,
+}
+
+#[derive(Debug)]
 pub enum Response {
     OK,
-    Reserved,
+    Reserved(Job),
     Inserted(Id),
     Buried(Id),
     Using(Tube),
@@ -23,6 +36,8 @@ pub enum Response {
     UnknownCommand,
 
     ConnectionClosed,
+    // Custom type used for reserved job response parsing.
+    Pre(PreJob),
 }
 
 impl Display for Response {

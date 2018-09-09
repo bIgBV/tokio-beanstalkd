@@ -42,7 +42,23 @@ impl Beanstalkd {
                 ttr,
                 data,
             })
-        // TODO proper error handling
+            // TODO proper error handling
+            .and_then(|conn| {
+                conn.into_future().then(|val| match val {
+                    Ok((Some(val), conn)) => Ok((Beanstalkd { connection: conn }, Ok(val))),
+                    // None is only returned when the stream is closed
+                    Ok((None, _)) => bail!("Stream closed"),
+                    Err(_) => bail!("Something bad happened"),
+                })
+            })
+    }
+
+    pub fn reserve(
+        self,
+    ) -> impl Future<Item = (Self, Result<proto::Response, failure::Error>), Error = failure::Error>
+    {
+        self.connection
+            .send(proto::Request::Reserve)
             .and_then(|conn| {
                 conn.into_future().then(|val| match val {
                     Ok((Some(val), conn)) => Ok((Beanstalkd { connection: conn }, Ok(val))),
@@ -56,6 +72,7 @@ impl Beanstalkd {
 
 #[cfg(test)]
 mod tests {
+    // TODO: spawn a separate process for beanstalkd so the tests don't depend on anything else.
     use super::*;
 
     #[test]
@@ -76,5 +93,23 @@ mod tests {
         assert!(!bean.is_err());
         drop(bean);
         rt.shutdown_on_idle();
+    }
+
+    #[test]
+    fn consumer_commands() {
+        let mut rt = tokio::runtime::Runtime::new().unwrap();
+        let bean = rt.block_on(
+            Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()).and_then(|bean| {
+                bean.put(0, 1, 1, "data")
+                    .inspect(|(_, response)| assert!(response.is_ok()))
+                    .and_then(|(bean, _)| bean.reserve())
+                    .inspect(|(_, response)| match response {
+                        Ok(proto::Response::Reserved(j)) => {
+                            assert_eq!(j.data, "data".to_owned());
+                        }
+                        _ => panic!("Wrong response received"),
+                    })
+            }),
+        );
     }
 }

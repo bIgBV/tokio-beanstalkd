@@ -10,7 +10,7 @@ mod request;
 mod response;
 
 pub(crate) use self::request::Request;
-pub(crate) use self::response::Response;
+pub(crate) use self::response::{Job, PreJob, Response};
 
 pub(crate) struct CommandCodec {
     /// Prefix of outbox that has been sent
@@ -20,6 +20,28 @@ pub(crate) struct CommandCodec {
 impl CommandCodec {
     pub(crate) fn new() -> CommandCodec {
         CommandCodec { outstart: 0 }
+    }
+
+    fn parse_job(
+        &mut self,
+        src: &mut BytesMut,
+        offset: usize,
+        pre: PreJob,
+    ) -> Result<Option<Job>, failure::Error> {
+        if let Some(carriage_offset) = src[offset..].iter().position(|b| *b == b'\r') {
+            if src[carriage_offset + 1] == b'\n' {
+                let line = src.split_to(offset + carriage_offset + 2);
+                let line = utf8(&line)?;
+                let line: Vec<&str> = line.trim().split(" ").collect();
+                return Ok(Some(Job {
+                    id: pre.id,
+                    bytes: pre.bytes,
+                    data: String::from(line[0]),
+                }));
+            }
+        }
+        self.outstart += src.len();
+        Ok(None)
     }
 }
 
@@ -48,6 +70,12 @@ impl Encoder for CommandCodec {
                 dst.put(foramt_string.as_bytes());
                 Ok(())
             }
+            Request::Reserve => {
+                let mut format_string = format!("reserve");
+                dst.reserve(format_string.len());
+                dst.put(format_string.as_bytes());
+                Ok(())
+            }
         }
     }
 }
@@ -56,6 +84,12 @@ fn utf8(buf: &[u8]) -> Result<&str, io::Error> {
     str::from_utf8(buf)
         // This should never happen since everything is ascii
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Unable to decode input as UTF8"))
+}
+
+fn parse_pre_job(list: Vec<&str>) -> Result<PreJob, failure::Error> {
+    let id = u32::from_str(list[0])?;
+    let bytes = usize::from_str(list[1])?;
+    Ok(PreJob { id, bytes })
 }
 
 fn parse_response(list: Vec<&str>) -> Result<Response, failure::Error> {
@@ -80,6 +114,13 @@ fn parse_response(list: Vec<&str>) -> Result<Response, failure::Error> {
             _ => bail!("Unknown resonse from server"),
         };
     }
+
+    if list.len() == 3 {
+        return match list[0] {
+            "RESERVED" => Ok(Response::Pre(parse_pre_job(list[1..].to_vec())?)),
+            _ => bail!("Unknown response from server."),
+        };
+    }
     // TODO Consumer commands
     //
     bail!("Unable to parse response")
@@ -94,12 +135,27 @@ impl Decoder for CommandCodec {
             if src[carriage_offset + 1] == b'\n' {
                 // Afterwards src contains elements [at, len), and the returned BytesMut
                 // contains elements [0, at), so + 1 for \r and then +1 for \n
-                let line = src.split_to(self.outstart + carriage_offset + 1 + 1);
+                let offset = self.outstart + carriage_offset + 1 + 1;
+                let line = src.split_to(offset);
                 let line = utf8(&line)?;
                 let line = line.trim().split(" ").collect();
-                self.outstart = 0;
 
-                return Ok(Some(parse_response(line)?));
+                let response = parse_response(line)?;
+
+                match response {
+                    Response::Pre(v) => {
+                        if let Some(job) = self.parse_job(src, offset, v)? {
+                            self.outstart = 0;
+                            return Ok(Some(Response::Reserved(job)));
+                        } else {
+                            return Ok(None);
+                        }
+                    }
+                    _ => {
+                        self.outstart = 0;
+                        return Ok(Some(response));
+                    }
+                };
             }
         }
         self.outstart = src.len();
