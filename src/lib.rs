@@ -111,6 +111,15 @@ impl Beanstalkd {
             })
             .and_then(|conn| handle_response!(conn))
     }
+
+    pub fn touch(
+        self,
+        id: u32,
+    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error> {
+        self.connection
+            .send(Request::Touch { id })
+            .and_then(|conn| handle_response!(conn))
+    }
 }
 
 #[cfg(test)]
@@ -161,7 +170,21 @@ mod tests {
                         _ => panic!("Wrong response received"),
                     })
                     .and_then(|(bean, response)| match response {
-                        Ok(Response::Reserved(j)) => bean.release(j.id, 10, 10),
+                        Ok(Response::Reserved(j)) => bean.touch(j.id),
+                        Ok(_) => panic!("Wrong response returned"),
+                        Err(e) => panic!("Got error: {}", e),
+                    })
+                    .inspect(|(_, response)| match response {
+                        Ok(v) => assert_eq!(*v, Response::Touched),
+                        Err(e) => panic!("Got error: {}", e),
+                    })
+                    .and_then(|(bean, _)| {
+                        // how about another one?
+                        bean.put(0, 1, 1, &b"more data"[..])
+                    })
+                    .and_then(|(bean, _)| bean.reserve())
+                    .and_then(|(bean, response)| match response {
+                        Ok(Response::Reserved(job)) => bean.release(job.id, 10, 10),
                         Ok(_) => panic!("Wrong response returned"),
                         Err(e) => panic!("Got error: {}", e),
                     })

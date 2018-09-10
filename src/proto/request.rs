@@ -22,6 +22,13 @@ pub enum Request {
         priority: u32,
         delay: u32,
     },
+    Bury {
+        id: super::Id,
+        priority: u32,
+    },
+    Touch {
+        id: super::Id,
+    },
 }
 
 impl Request {
@@ -39,7 +46,9 @@ impl Request {
             Request::Reserve
             | Request::Use { .. }
             | Request::Delete { .. }
-            | Request::Release { .. } => {}
+            | Request::Release { .. }
+            | Request::Bury { .. }
+            | Request::Touch { .. } => {}
         }
     }
 }
@@ -68,6 +77,8 @@ impl fmt::Display for Request {
                 priority,
                 delay,
             } => write!(f, "release {} {} {}\r\n", id, priority, delay),
+            Request::Bury { id, priority } => write!(f, "bury {} {}\r\n", id, priority),
+            Request::Touch { id } => write!(f, "touch {}\r\n", id),
         }
     }
 }

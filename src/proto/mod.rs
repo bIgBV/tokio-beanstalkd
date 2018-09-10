@@ -43,6 +43,7 @@ impl CommandCodec {
                 "DRAINING" => Err(failure::Error::from(error::Put::Draining)),
                 "NOT_FOUND" => Err(failure::Error::from(error::Consumer::NotFound)),
                 "BURIED" => Err(failure::Error::from(error::Consumer::Buried)),
+                "TOUCHED" => Ok(Response::Touched),
                 "RELEASED" => Ok(Response::Released),
                 "DELETED" => Ok(Response::Deleted),
                 _ => bail!("Unknown response from server"),
@@ -55,10 +56,6 @@ impl CommandCodec {
                 "INSERTED" => {
                     let id = FromStr::from_str(list[1])?;
                     Ok(Response::Inserted(id))
-                }
-                "BURIED" => {
-                    let id = FromStr::from_str(list[1])?;
-                    Ok(Response::Buried(id))
                 }
                 "USING" => Ok(Response::Using(String::from(list[1]))),
                 _ => bail!("Unknown resonse from server"),
@@ -149,6 +146,7 @@ impl Encoder for CommandCodec {
     type Error = failure::Error;
 
     fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        eprintln!("Making request: {:?}", item);
         item.serialize(dst);
         Ok(())
     }

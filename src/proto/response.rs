@@ -18,12 +18,13 @@ pub enum Response {
     OK,
     Reserved(Job),
     Inserted(super::Id),
-    Buried(super::Id),
+    Buried,
     Using(super::Tube),
     Deleted,
     Watching,
     NotIgnored,
     Released,
+    Touched,
 
     ConnectionClosed,
     // Custom type used for reserved job response parsing.
