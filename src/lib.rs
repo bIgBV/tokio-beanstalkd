@@ -18,8 +18,9 @@ use std::borrow::Cow;
 use std::net::SocketAddr;
 
 pub use proto::error;
-pub use proto::Request;
 pub use proto::Response;
+// Request doesn't have to be a public type
+use proto::Request;
 
 macro_rules! handle_response {
     ($input:ident) => {
@@ -148,6 +149,24 @@ impl Beanstalkd {
             .send(Request::Bury { id, priority })
             .and_then(|conn| handle_response!(conn))
     }
+
+    pub fn watch(
+        self,
+        tube: &'static str,
+    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error> {
+        self.connection
+            .send(Request::Watch { tube })
+            .and_then(|conn| handle_response!(conn))
+    }
+
+    pub fn ignore(
+        self,
+        tube: &'static str,
+    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error> {
+        self.connection
+            .send(Request::Ignore { tube })
+            .and_then(|conn| handle_response!(conn))
+    }
 }
 
 #[cfg(test)]
@@ -246,6 +265,16 @@ mod tests {
                             // assert_eq!(*e, error::Consumer::NotFound);
                             panic!("Got error: {}", e)
                         }
+                    })
+                    .and_then(|(bean, _)| bean.watch("test"))
+                    .inspect(|(_, response)| match response {
+                        Ok(v) => assert_eq!(*v, Response::Watching(2)),
+                        Err(e) => panic!("Got error: {}", e),
+                    })
+                    .and_then(|(bean, _)| bean.ignore("test"))
+                    .inspect(|(_, response)| match response {
+                        Ok(v) => assert_eq!(*v, Response::Watching(1)),
+                        Err(e) => panic!("Got error: {}", e),
                     })
             }),
         );

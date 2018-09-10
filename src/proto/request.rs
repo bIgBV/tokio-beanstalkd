@@ -29,6 +29,12 @@ pub enum Request {
     Touch {
         id: super::Id,
     },
+    Watch {
+        tube: &'static str,
+    },
+    Ignore {
+        tube: &'static str,
+    },
 }
 
 impl Request {
@@ -48,7 +54,9 @@ impl Request {
             | Request::Delete { .. }
             | Request::Release { .. }
             | Request::Bury { .. }
-            | Request::Touch { .. } => {}
+            | Request::Touch { .. }
+            | Request::Watch { .. }
+            | Request::Ignore { .. } => {}
         }
     }
 }
@@ -79,6 +87,8 @@ impl fmt::Display for Request {
             } => write!(f, "release {} {} {}\r\n", id, priority, delay),
             Request::Bury { id, priority } => write!(f, "bury {} {}\r\n", id, priority),
             Request::Touch { id } => write!(f, "touch {}\r\n", id),
+            Request::Watch { tube } => write!(f, "watch {}\r\n", tube),
+            Request::Ignore { tube } => write!(f, "ignore {}\r\n", tube),
         }
     }
 }

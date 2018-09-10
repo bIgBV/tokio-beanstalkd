@@ -52,4 +52,7 @@ pub enum Consumer {
     /// if the server ran out of memory trying to grow the priority queue data structure.
     #[fail(display = "Job got buried")]
     Buried,
+    /// If the client attempts to ignore the only tube in its watch list.
+    #[fail(display="Tried to ignore the only tube being watched")]
+    NotIgnored
 }

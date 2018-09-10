@@ -21,7 +21,7 @@ pub enum Response {
     Buried,
     Using(super::Tube),
     Deleted,
-    Watching,
+    Watching(u32),
     NotIgnored,
     Released,
     Touched,
