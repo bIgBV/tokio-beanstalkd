@@ -1,3 +1,5 @@
+//! Error types returned by Beanstalkd
+
 /// Errors that can be returned for any command
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Fail)]
 pub enum BeanstalkError {

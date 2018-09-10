@@ -1,3 +1,4 @@
+//! Response types returned by Beanstalkd
 use std::fmt::{self, Display};
 
 #[derive(Debug, PartialEq, Eq)]

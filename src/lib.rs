@@ -2,7 +2,6 @@
 /// fast work queue.
 ///
 /// # About Beanstalkd
-///
 extern crate bytes;
 extern crate futures;
 #[macro_use]
@@ -55,7 +54,7 @@ impl Beanstalkd {
         delay: u32,
         ttr: u32,
         data: D,
-    ) -> impl Future<Item = (Self, Result<proto::Response, failure::Error>), Error = failure::Error>
+    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error>
     where
         D: Into<Cow<'static, [u8]>>,
     {
@@ -72,7 +71,7 @@ impl Beanstalkd {
 
     pub fn reserve(
         self,
-    ) -> impl Future<Item = (Self, Result<proto::Response, failure::Error>), Error = failure::Error>
+    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error>
     {
         self.connection
             .send(proto::Request::Reserve)
@@ -82,7 +81,7 @@ impl Beanstalkd {
     pub fn using(
         self,
         tube: &'static str,
-    ) -> impl Future<Item = (Self, Result<proto::Response, failure::Error>), Error = failure::Error>
+    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error>
     {
         self.connection
             .send(Request::Use { tube })
@@ -92,7 +91,7 @@ impl Beanstalkd {
     pub fn delete(
         self,
         id: u32,
-    ) -> impl Future<Item = (Self, Result<proto::Response, failure::Error>), Error = failure::Error>
+    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error>
     {
         self.connection
             .send(Request::Delete { id })
