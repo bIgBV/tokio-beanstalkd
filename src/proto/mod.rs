@@ -27,6 +27,7 @@ impl CommandCodec {
     }
 
     fn parse_response(&self, list: Vec<&str>) -> Result<Response, failure::Error> {
+        eprintln!("Parsing: {:?}", list);
         if list.len() == 1 {
             return match list[0] {
                 "OUT_OF_MEMORY" => Err(failure::Error::from(BeanstalkError::OutOfMemory)),
@@ -41,11 +42,17 @@ impl CommandCodec {
         }
 
         if list.len() == 2 {
-            let id = FromStr::from_str(list[1])?;
+            eprintln!("Parsing: {:?}", list[1]);
             return match list[0] {
-                "INSERTED" => Ok(Response::Inserted(id)),
-                "BURIED" => Ok(Response::Buried(id)),
-                "USING" => Ok(Response::Using(id.to_string())),
+                "INSERTED" => {
+                    let id = FromStr::from_str(list[1])?;
+                    Ok(Response::Inserted(id))
+                }
+                "BURIED" => {
+                    let id = FromStr::from_str(list[1])?;
+                    Ok(Response::Buried(id))
+                }
+                "USING" => Ok(Response::Using(String::from(list[1]))),
                 _ => bail!("Unknown resonse from server"),
             };
         }
@@ -92,6 +99,7 @@ impl Decoder for CommandCodec {
     type Error = failure::Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        eprintln!("Decoding: {:?}", src);
         if let Some(carriage_offset) = src[self.outstart..].iter().position(|b| *b == b'\r') {
             if src[carriage_offset + 1] == b'\n' {
                 // Afterwards src contains elements [at, len), and the returned BytesMut
@@ -103,6 +111,7 @@ impl Decoder for CommandCodec {
 
                 let response = self.parse_response(line)?;
 
+                eprintln!("Got response: {:?}", response);
                 match response {
                     Response::Pre(pre) => {
                         if let Some(job) = self.parse_job(src, pre)? {
