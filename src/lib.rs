@@ -97,15 +97,21 @@ impl Beanstalkd {
             })
     }
 
-    pub fn delete(self, id: u32) -> impl Future<Item = (Self, Result<proto::Response, failure::Error>), Error = failure::Error> {
-        self.connection.send(Request::Delete{id}).and_then(|conn| {
+    pub fn delete(
+        self,
+        id: u32,
+    ) -> impl Future<Item = (Self, Result<proto::Response, failure::Error>), Error = failure::Error>
+    {
+        self.connection
+            .send(Request::Delete { id })
+            .and_then(|conn| {
                 conn.into_future().then(|val| match val {
                     Ok((Some(val), conn)) => Ok((Beanstalkd { connection: conn }, Ok(val))),
                     // None is only returned when the stream is closed
                     Ok((None, _)) => bail!("Stream closed"),
                     Err((e, conn)) => Ok((Beanstalkd { connection: conn }, Err(e))),
                 })
-        })
+            })
     }
 }
 
@@ -161,6 +167,18 @@ mod tests {
                         bean.put(0, 1, 1, &b"more data"[..])
                     })
                     .inspect(|(_, response)| assert!(response.is_ok()))
+                    .and_then(|(bean, response)| match response {
+                        Ok(Response::Inserted(id)) => bean.delete(id),
+                        Ok(_) => panic!("Wrong response returned"),
+                        Err(e) => panic!("Got error: {}", e),
+                    })
+                    .inspect(|(_, response)| match response {
+                        Ok(v) => assert_eq!(*v, Response::Deleted),
+                        Err(e) => {
+                            // assert_eq!(*e, proto::error::Consumer::NotFound);
+                            panic!("Got error: {}", e)
+                        }
+                    })
             }),
         );
         assert!(!bean.is_err());

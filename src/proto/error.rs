@@ -1,4 +1,4 @@
-/// Errors that may be caused
+/// Errors that can be returned for any command
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Fail)]
 pub enum BeanstalkError {
     /// The client sent a command line that was not well-formed. This can happen if the line does not
@@ -24,6 +24,7 @@ pub enum BeanstalkError {
     UnknownCommand,
 }
 
+/// Errors which can be casued due to a PUT command
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Fail)]
 pub enum Put {
     /// The job body must be followed by a CR-LF pair, that is, "\r\n". These two bytes are not counted
@@ -41,4 +42,11 @@ pub enum Put {
     /// The client should try another server or disconnect and try again later.
     #[fail(display = "Server is in drain mode")]
     Draining,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Fail)]
+pub enum Consumer {
+    /// If the job does not exist or is not either reserved by the client
+    #[fail(display = "Did not find a job of that Id")]
+    NotFound,
 }
