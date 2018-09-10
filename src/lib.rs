@@ -20,6 +20,17 @@ use std::net::SocketAddr;
 pub use proto::Request;
 pub use proto::Response;
 
+macro_rules! handle_response {
+    ($input:ident) => {
+        $input.into_future().then(|val| match val {
+            Ok((Some(val), conn)) => Ok((Beanstalkd { connection: conn }, Ok(val))),
+            // None is only returned when the stream is closed
+            Ok((None, _)) => bail!("Stream closed"),
+            Err((e, conn)) => Ok((Beanstalkd { connection: conn }, Err(e))),
+        })
+    };
+}
+
 pub struct Beanstalkd {
     connection: Framed<tokio::net::TcpStream, proto::CommandCodec>,
 }
@@ -54,14 +65,7 @@ impl Beanstalkd {
                 ttr,
                 data,
             })
-            .and_then(|conn| {
-                conn.into_future().then(|val| match val {
-                    Ok((Some(val), conn)) => Ok((Beanstalkd { connection: conn }, Ok(val))),
-                    // None is only returned when the stream is closed
-                    Ok((None, _)) => bail!("Stream closed"),
-                    Err((e, conn)) => Ok((Beanstalkd { connection: conn }, Err(e))),
-                })
-            })
+            .and_then(|conn| handle_response!(conn))
     }
 
     pub fn reserve(
@@ -70,14 +74,7 @@ impl Beanstalkd {
     {
         self.connection
             .send(proto::Request::Reserve)
-            .and_then(|conn| {
-                conn.into_future().then(|val| match val {
-                    Ok((Some(val), conn)) => Ok((Beanstalkd { connection: conn }, Ok(val))),
-                    // None is only returned when the stream is closed
-                    Ok((None, _)) => bail!("Stream closed"),
-                    Err((e, conn)) => Ok((Beanstalkd { connection: conn }, Err(e))),
-                })
-            })
+            .and_then(|conn| handle_response!(conn))
     }
 
     pub fn using(
@@ -87,14 +84,7 @@ impl Beanstalkd {
     {
         self.connection
             .send(Request::Use { tube })
-            .and_then(|conn| {
-                conn.into_future().then(|val| match val {
-                    Ok((Some(val), conn)) => Ok((Beanstalkd { connection: conn }, Ok(val))),
-                    // None is only returned when the stream is closed
-                    Ok((None, _)) => bail!("Stream closed"),
-                    Err((e, conn)) => Ok((Beanstalkd { connection: conn }, Err(e))),
-                })
-            })
+            .and_then(|conn| handle_response!(conn))
     }
 
     pub fn delete(
@@ -104,14 +94,22 @@ impl Beanstalkd {
     {
         self.connection
             .send(Request::Delete { id })
-            .and_then(|conn| {
-                conn.into_future().then(|val| match val {
-                    Ok((Some(val), conn)) => Ok((Beanstalkd { connection: conn }, Ok(val))),
-                    // None is only returned when the stream is closed
-                    Ok((None, _)) => bail!("Stream closed"),
-                    Err((e, conn)) => Ok((Beanstalkd { connection: conn }, Err(e))),
-                })
+            .and_then(|conn| handle_response!(conn))
+    }
+
+    pub fn release(
+        self,
+        id: u32,
+        priority: u32,
+        delay: u32,
+    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error> {
+        self.connection
+            .send(Request::Release {
+                id,
+                priority,
+                delay,
             })
+            .and_then(|conn| handle_response!(conn))
     }
 }
 
