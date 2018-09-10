@@ -14,6 +14,9 @@ pub enum Request {
     Use {
         tube: &'static str,
     },
+    Delete {
+        id: super::Id,
+    },
 }
 
 impl Request {
@@ -30,6 +33,7 @@ impl Request {
             }
             Request::Reserve => {}
             Request::Use { .. } => {}
+            Request::Delete { .. } => {}
         }
     }
 }
@@ -52,6 +56,7 @@ impl fmt::Display for Request {
             ),
             Request::Reserve => write!(f, "reserve\r\n"),
             Request::Use { tube } => write!(f, "use {}\r\n", tube),
+            Request::Delete { id } => write!(f, "delete {}\r\n", id),
         }
     }
 }

@@ -96,6 +96,17 @@ impl Beanstalkd {
                 })
             })
     }
+
+    pub fn delete(self, id: u32) -> impl Future<Item = (Self, Result<proto::Response, failure::Error>), Error = failure::Error> {
+        self.connection.send(Request::Delete{id}).and_then(|conn| {
+                conn.into_future().then(|val| match val {
+                    Ok((Some(val), conn)) => Ok((Beanstalkd { connection: conn }, Ok(val))),
+                    // None is only returned when the stream is closed
+                    Ok((None, _)) => bail!("Stream closed"),
+                    Err((e, conn)) => Ok((Beanstalkd { connection: conn }, Err(e))),
+                })
+        })
+    }
 }
 
 #[cfg(test)]

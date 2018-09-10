@@ -10,11 +10,15 @@ pub mod error;
 mod request;
 mod response;
 
-use self::error::{BeanstalkError, Put};
+use self::error::BeanstalkError;
 pub use self::request::Request;
 pub use self::response::Response;
 
 use self::response::{Job, PreJob};
+
+pub type Tube = String;
+
+pub type Id = u32;
 
 pub(crate) struct CommandCodec {
     /// Prefix of outbox that has been sent

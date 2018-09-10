@@ -1,18 +1,14 @@
 use std::fmt::{self, Display};
 
-pub type Tube = String;
-
-pub type Id = u32;
-
 #[derive(Debug, PartialEq, Eq)]
 pub struct PreJob {
-    pub id: Id,
+    pub id: super::Id,
     pub bytes: usize,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Job {
-    pub id: Id,
+    pub id: super::Id,
     pub bytes: usize,
     pub data: Vec<u8>,
 }
@@ -21,9 +17,9 @@ pub struct Job {
 pub enum Response {
     OK,
     Reserved(Job),
-    Inserted(Id),
-    Buried(Id),
-    Using(Tube),
+    Inserted(super::Id),
+    Buried(super::Id),
+    Using(super::Tube),
     Deleted,
     Watching,
     NotIgnored,
