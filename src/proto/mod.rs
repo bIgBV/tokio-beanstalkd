@@ -33,9 +33,9 @@ impl CommandCodec {
                 "INTERNAL_ERROR" => Err(failure::Error::from(BeanstalkError::InternalError)),
                 "BAD_FORMAT" => Err(failure::Error::from(BeanstalkError::BadFormat)),
                 "UNKNOWN_COMMAND" => Err(failure::Error::from(BeanstalkError::UnknownCommand)),
-                "EXPECTED_CRLF" => Ok(Response::ExpectedCLRF),
-                "JOB_TOO_BIG" => Ok(Response::JobTooBig),
-                "DRAINING" => Ok(Response::Draining),
+                "EXPECTED_CRLF" => Err(failure::Error::from(error::Put::ExpectedCLRF)),
+                "JOB_TOO_BIG" => Err(failure::Error::from(error::Put::JobTooBig)),
+                "DRAINING" => Err(failure::Error::from(error::Put::Draining)),
                 _ => bail!("Unknown response from server"),
             };
         }
@@ -139,12 +139,12 @@ impl Encoder for CommandCodec {
                 data,
             } => {
                 let mut foramt_string = format!(
-                    "put {pri} \r\n",
+                    "put {pri} {del} {ttr} {len}\r\n{data}\r\n",
                     pri = priority,
-                    // del = delay,
-                    // ttr = ttr,
-                    // len = data.len(),
-                    // data = data
+                    del = delay,
+                    ttr = ttr,
+                    len = data.len(),
+                    data = data
                 );
 
                 dst.reserve(foramt_string.len());

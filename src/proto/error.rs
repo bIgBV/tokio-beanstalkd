@@ -1,3 +1,4 @@
+/// Errors that may be caused 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Fail)]
 pub enum BeanstalkError {
     /// The client sent a command line that was not well-formed. This can happen if the line does not
@@ -29,15 +30,15 @@ pub enum Put {
     /// in the job size given by the client in the put command line.
     ///
     /// This should never happen, if it does please file an issue.
-    #[derive(display = "CRLF missing from the end of command")]
+    #[fail(display = "CRLF missing from the end of command")]
     ExpectedCLRF,
 
     /// The client has requested to put a job with a body larger than max-job-size bytes
-    #[derive(display = "Job size exceeds max-job-size bytes")]
+    #[fail(display = "Job size exceeds max-job-size bytes")]
     JobTooBig,
 
     /// This means that the server has been put into "drain mode" and is no longer accepting new jobs.
     /// The client should try another server or disconnect and try again later.
-    #[derive(display = "Server is in drain mode")]
+    #[fail(display = "Server is in drain mode")]
     Draining,
 }
