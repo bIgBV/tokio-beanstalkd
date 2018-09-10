@@ -1,4 +1,4 @@
-/// Errors that may be caused 
+/// Errors that may be caused
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Fail)]
 pub enum BeanstalkError {
     /// The client sent a command line that was not well-formed. This can happen if the line does not
@@ -6,21 +6,21 @@ pub enum BeanstalkError {
     /// number of arguments are present, or if the command line is mal-formed in any other way.
     ///
     /// This should not happen, if it does please file an issue.
-    #[fail(display="Client command was not well formatted")]
+    #[fail(display = "Client command was not well formatted")]
     BadFormat,
 
     /// The server cannot allocate enough memory for the job. The client should try again later.
-    #[fail(display="Server out of memory")]
+    #[fail(display = "Server out of memory")]
     OutOfMemory,
 
     /// This indicates a bug in the server. It should never happen. If it does happen, please report it
     /// at http://groups.google.com/group/beanstalk-talk.
-    #[fail(display="Internal server error")]
+    #[fail(display = "Internal server error")]
     InternalError,
     /// The client sent a command that the server does not know.
     ///
     /// This should not happen, if it does please file an issue.
-    #[fail(display="Unknown command sent by client")]
+    #[fail(display = "Unknown command sent by client")]
     UnknownCommand,
 }
 

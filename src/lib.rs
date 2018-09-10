@@ -50,7 +50,7 @@ impl Beanstalkd {
                     Ok((Some(val), conn)) => Ok((Beanstalkd { connection: conn }, Ok(val))),
                     // None is only returned when the stream is closed
                     Ok((None, _)) => bail!("Stream closed"),
-                    Err((e, conn)) => Ok(( Beanstalkd {connection: conn}, Err(e))),
+                    Err((e, conn)) => Ok((Beanstalkd { connection: conn }, Err(e))),
                 })
             })
     }
@@ -66,7 +66,7 @@ impl Beanstalkd {
                     Ok((Some(val), conn)) => Ok((Beanstalkd { connection: conn }, Ok(val))),
                     // None is only returned when the stream is closed
                     Ok((None, _)) => bail!("Stream closed"),
-                    Err((e, conn)) => Err(e),
+                    Err((e, conn)) => Ok((Beanstalkd { connection: conn }, Err(e))),
                 })
             })
     }

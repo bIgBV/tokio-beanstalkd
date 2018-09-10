@@ -6,9 +6,9 @@ use std::io;
 use std::str;
 use std::str::FromStr;
 
+mod error;
 mod request;
 mod response;
-mod error;
 
 pub use self::error::BeanstalkError;
 pub use self::request::Request;
@@ -131,33 +131,10 @@ impl Encoder for CommandCodec {
     type Error = failure::Error;
 
     fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        match item {
-            Request::Put {
-                priority,
-                delay,
-                ttr,
-                data,
-            } => {
-                let mut foramt_string = format!(
-                    "put {pri} {del} {ttr} {len}\r\n{data}\r\n",
-                    pri = priority,
-                    del = delay,
-                    ttr = ttr,
-                    len = data.len(),
-                    data = data
-                );
-
-                dst.reserve(foramt_string.len());
-                dst.put(foramt_string.as_bytes());
-                Ok(())
-            }
-            Request::Reserve => {
-                let mut format_string = format!("reserve\r\n");
-                dst.reserve(format_string.len());
-                dst.put(format_string.as_bytes());
-                Ok(())
-            }
-        }
+        let format_string = format!("{}", item);
+        dst.reserve(format_string.len());
+        dst.put(format_string.as_bytes());
+        Ok(())
     }
 }
 
