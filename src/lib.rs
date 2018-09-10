@@ -19,6 +19,7 @@ use std::net::SocketAddr;
 
 pub use proto::Request;
 pub use proto::Response;
+pub use proto::error as error;
 
 macro_rules! handle_response {
     ($input:ident) => {
@@ -109,7 +110,22 @@ impl Beanstalkd {
                 priority,
                 delay,
             })
-            .and_then(|conn| handle_response!(conn))
+            .and_then(|conn| {
+                conn.into_future().then(|val| match val {
+                    // Since both release and bury can get BURIED in the response from the server, but 
+                    // in the case of release, it is an error, handle it appropriately.
+                    Ok((Some(Response::Released), conn)) => Ok((Beanstalkd { connection: conn }, Ok(Response::Released))),
+                    Ok((Some(Response::Buried), conn)) => Ok((
+                        Beanstalkd { connection: conn },
+                        Err(failure::Error::from(error::Consumer::Buried)),
+                    )),
+                    // This should never happen
+                    Ok((Some(_), _)) => bail!("Wrong response from server"),
+                    // None is only returned when the stream is closed
+                    Ok((None, _)) => bail!("Stream closed"),
+                    Err((e, conn)) => Ok((Beanstalkd { connection: conn }, Err(e))),
+                })
+            })
     }
 
     pub fn touch(
@@ -205,7 +221,7 @@ mod tests {
                     .inspect(|(_, response)| match response {
                         Ok(v) => assert_eq!(*v, Response::Deleted),
                         Err(e) => {
-                            // assert_eq!(*e, proto::error::Consumer::NotFound);
+                            // assert_eq!(*e, error::Consumer::NotFound);
                             panic!("Got error: {}", e)
                         }
                     })

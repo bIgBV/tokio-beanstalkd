@@ -42,7 +42,7 @@ impl CommandCodec {
                 "JOB_TOO_BIG" => Err(failure::Error::from(error::Put::JobTooBig)),
                 "DRAINING" => Err(failure::Error::from(error::Put::Draining)),
                 "NOT_FOUND" => Err(failure::Error::from(error::Consumer::NotFound)),
-                "BURIED" => Err(failure::Error::from(error::Consumer::Buried)),
+                "BURIED" => Ok(Response::Buried),
                 "TOUCHED" => Ok(Response::Touched),
                 "RELEASED" => Ok(Response::Released),
                 "DELETED" => Ok(Response::Deleted),
