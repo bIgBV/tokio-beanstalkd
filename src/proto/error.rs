@@ -49,4 +49,7 @@ pub enum Consumer {
     /// If the job does not exist or is not either reserved by the client
     #[fail(display = "Did not find a job of that Id")]
     NotFound,
+    /// if the server ran out of memory trying to grow the priority queue data structure.
+    #[fail(display = "Job got buried")]
+    Buried,
 }

@@ -155,10 +155,19 @@ mod tests {
                     .inspect(|(_, response)| assert!(response.is_ok()))
                     .and_then(|(bean, _)| bean.reserve())
                     .inspect(|(_, response)| match response {
-                        Ok(proto::Response::Reserved(j)) => {
+                        Ok(Response::Reserved(j)) => {
                             assert_eq!(j.data, b"data");
                         }
                         _ => panic!("Wrong response received"),
+                    })
+                    .and_then(|(bean, response)| match response {
+                        Ok(Response::Reserved(j)) => bean.release(j.id, 10, 10),
+                        Ok(_) => panic!("Wrong response returned"),
+                        Err(e) => panic!("Got error: {}", e),
+                    })
+                    .inspect(|(_, response)| match response {
+                        Ok(v) => assert_eq!(*v, Response::Released),
+                        Err(e) => panic!("Got error: {}", e),
                     })
                     .and_then(|(bean, _)| {
                         // how about another one?

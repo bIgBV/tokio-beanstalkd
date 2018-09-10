@@ -17,6 +17,11 @@ pub enum Request {
     Delete {
         id: super::Id,
     },
+    Release {
+        id: super::Id,
+        priority: u32,
+        delay: u32,
+    },
 }
 
 impl Request {
@@ -31,9 +36,10 @@ impl Request {
                 dst.reserve(2);
                 dst.put(&b"\r\n"[..]);
             }
-            Request::Reserve => {}
-            Request::Use { .. } => {}
-            Request::Delete { .. } => {}
+            Request::Reserve
+            | Request::Use { .. }
+            | Request::Delete { .. }
+            | Request::Release { .. } => {}
         }
     }
 }
@@ -57,6 +63,11 @@ impl fmt::Display for Request {
             Request::Reserve => write!(f, "reserve\r\n"),
             Request::Use { tube } => write!(f, "use {}\r\n", tube),
             Request::Delete { id } => write!(f, "delete {}\r\n", id),
+            Request::Release {
+                id,
+                priority,
+                delay,
+            } => write!(f, "release {} {} {}\r\n", id, priority, delay),
         }
     }
 }

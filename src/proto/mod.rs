@@ -42,6 +42,8 @@ impl CommandCodec {
                 "JOB_TOO_BIG" => Err(failure::Error::from(error::Put::JobTooBig)),
                 "DRAINING" => Err(failure::Error::from(error::Put::Draining)),
                 "NOT_FOUND" => Err(failure::Error::from(error::Consumer::NotFound)),
+                "BURIED" => Err(failure::Error::from(error::Consumer::Buried)),
+                "RELEASED" => Ok(Response::Released),
                 "DELETED" => Ok(Response::Deleted),
                 _ => bail!("Unknown response from server"),
             };

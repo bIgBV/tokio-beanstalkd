@@ -23,6 +23,7 @@ pub enum Response {
     Deleted,
     Watching,
     NotIgnored,
+    Released,
 
     ConnectionClosed,
     // Custom type used for reserved job response parsing.
