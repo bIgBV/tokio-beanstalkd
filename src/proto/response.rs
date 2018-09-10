@@ -4,20 +4,20 @@ pub type Tube = String;
 
 pub type Id = u32;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct PreJob {
     pub id: Id,
     pub bytes: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Job {
     pub id: Id,
     pub bytes: usize,
     pub data: Vec<u8>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Response {
     OK,
     Reserved(Job),

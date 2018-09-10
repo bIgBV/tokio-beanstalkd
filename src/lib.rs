@@ -2,10 +2,11 @@
 /// fast work queue.
 ///
 /// # About Beanstalkd
+///
 extern crate bytes;
+extern crate futures;
 #[macro_use]
 extern crate failure;
-extern crate futures;
 extern crate tokio;
 
 mod proto;
@@ -78,6 +79,23 @@ impl Beanstalkd {
                 })
             })
     }
+
+    pub fn using(
+        self,
+        tube: &'static str,
+    ) -> impl Future<Item = (Self, Result<proto::Response, failure::Error>), Error = failure::Error>
+    {
+        self.connection
+            .send(Request::Use { tube })
+            .and_then(|conn| {
+                conn.into_future().then(|val| match val {
+                    Ok((Some(val), conn)) => Ok((Beanstalkd { connection: conn }, Ok(val))),
+                    // None is only returned when the stream is closed
+                    Ok((None, _)) => bail!("Stream closed"),
+                    Err((e, conn)) => Ok((Beanstalkd { connection: conn }, Err(e))),
+                })
+            })
+    }
 }
 
 #[cfg(test)]
@@ -98,6 +116,14 @@ mod tests {
                         bean.put(0, 1, 1, &b"more data"[..])
                     })
                     .inspect(|(_, response)| assert!(response.is_ok()))
+                    .and_then(|(bean, _)| {
+                        // Let's watch a particular tube
+                        bean.using("test")
+                    })
+                    .inspect(|(_, response)| match response {
+                        Ok(v) => assert_eq!(*v, Response::Using("test".to_string())),
+                        Err(e) => panic!("Unexpected error: {}", e),
+                    })
             }),
         );
         assert!(!bean.is_err());

@@ -45,6 +45,7 @@ impl CommandCodec {
             return match list[0] {
                 "INSERTED" => Ok(Response::Inserted(id)),
                 "BURIED" => Ok(Response::Buried(id)),
+                "USING" => Ok(Response::Using(id.to_string())),
                 _ => bail!("Unknown resonse from server"),
             };
         }

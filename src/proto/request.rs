@@ -11,6 +11,9 @@ pub enum Request {
         data: Cow<'static, [u8]>,
     },
     Reserve,
+    Use {
+        tube: &'static str,
+    },
 }
 
 impl Request {
@@ -26,6 +29,7 @@ impl Request {
                 dst.put(&b"\r\n"[..]);
             }
             Request::Reserve => {}
+            Request::Use { .. } => {}
         }
     }
 }
@@ -47,6 +51,7 @@ impl fmt::Display for Request {
                 len = data.len(),
             ),
             Request::Reserve => write!(f, "reserve\r\n"),
+            Request::Use { tube } => write!(f, "use {}\r\n", tube),
         }
     }
 }
