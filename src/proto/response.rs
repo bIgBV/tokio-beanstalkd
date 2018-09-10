@@ -14,7 +14,7 @@ pub struct PreJob {
 pub struct Job {
     pub id: Id,
     pub bytes: usize,
-    pub data: String,
+    pub data: Vec<u8>,
 }
 
 #[derive(Debug)]

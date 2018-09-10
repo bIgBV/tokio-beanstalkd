@@ -1,3 +1,5 @@
+use bytes::{BufMut, BytesMut};
+use std::borrow::Cow;
 use std::fmt;
 
 #[derive(Debug)]
@@ -6,9 +8,26 @@ pub enum Request {
         priority: u32,
         delay: u32,
         ttr: u32,
-        data: &'static str,
+        data: Cow<'static, [u8]>,
     },
     Reserve,
+}
+
+impl Request {
+    pub(crate) fn serialize(&self, dst: &mut BytesMut) {
+        let format_string = format!("{}", &self);
+        dst.reserve(format_string.len());
+        dst.put(format_string.as_bytes());
+        match *self {
+            Request::Put { ref data, .. } => {
+                dst.reserve(data.len());
+                dst.put(&data[..]);
+                dst.reserve(2);
+                dst.put(&b"\r\n"[..]);
+            }
+            Request::Reserve => {}
+        }
+    }
 }
 
 impl fmt::Display for Request {
@@ -18,15 +37,14 @@ impl fmt::Display for Request {
                 priority,
                 delay,
                 ttr,
-                data,
+                ref data,
             } => write!(
                 f,
-                "put {pri} {del} {ttr} {len}\r\n{data}\r\n",
+                "put {pri} {del} {ttr} {len}\r\n",
                 pri = priority,
                 del = delay,
                 ttr = ttr,
                 len = data.len(),
-                data = data
             ),
             Request::Reserve => write!(f, "reserve\r\n"),
         }

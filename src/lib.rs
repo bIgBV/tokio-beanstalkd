@@ -1,3 +1,7 @@
+/// This crate provides a client for working with [Beanstalkd](https://beanstalkd.github.io/), a simple
+/// fast work queue.
+///
+/// # About Beanstalkd
 extern crate bytes;
 #[macro_use]
 extern crate failure;
@@ -9,6 +13,7 @@ mod proto;
 use tokio::codec::Framed;
 use tokio::prelude::*;
 
+use std::borrow::Cow;
 use std::net::SocketAddr;
 
 pub use proto::Request;
@@ -30,14 +35,17 @@ impl Beanstalkd {
         Beanstalkd { connection: bean }
     }
 
-    pub fn put(
+    pub fn put<D>(
         self,
         priority: u32,
         delay: u32,
         ttr: u32,
-        data: &'static str,
+        data: D,
     ) -> impl Future<Item = (Self, Result<proto::Response, failure::Error>), Error = failure::Error>
+    where
+        D: Into<Cow<'static, [u8]>>,
     {
+        let data = data.into();
         self.connection
             .send(proto::Request::Put {
                 priority,
@@ -83,11 +91,11 @@ mod tests {
         let bean = rt.block_on(
             Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()).and_then(|bean| {
                 // Let put a job in
-                bean.put(0, 1, 1, "data")
+                bean.put(0, 1, 1, &b"data"[..])
                     .inspect(|(_, response)| assert!(response.is_ok()))
                     .and_then(|(bean, _)| {
                         // how about another one?
-                        bean.put(0, 1, 1, "more data")
+                        bean.put(0, 1, 1, &b"more data"[..])
                     })
                     .inspect(|(_, response)| assert!(response.is_ok()))
             }),
@@ -102,18 +110,18 @@ mod tests {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         let bean = rt.block_on(
             Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()).and_then(|bean| {
-                bean.put(0, 1, 1, "data")
+                bean.put(0, 1, 1, &b"data"[..])
                     .inspect(|(_, response)| assert!(response.is_ok()))
                     .and_then(|(bean, _)| bean.reserve())
                     .inspect(|(_, response)| match response {
                         Ok(proto::Response::Reserved(j)) => {
-                            assert_eq!(j.data, "data".to_owned());
+                            assert_eq!(j.data, b"data");
                         }
                         _ => panic!("Wrong response received"),
                     })
                     .and_then(|(bean, _)| {
                         // how about another one?
-                        bean.put(0, 1, 1, "more data")
+                        bean.put(0, 1, 1, &b"more data"[..])
                     })
                     .inspect(|(_, response)| assert!(response.is_ok()))
             }),

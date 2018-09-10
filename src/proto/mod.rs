@@ -1,4 +1,4 @@
-use bytes::{BufMut, BytesMut};
+use bytes::BytesMut;
 use failure;
 use tokio::codec::{Decoder, Encoder};
 
@@ -6,11 +6,11 @@ use std::io;
 use std::str;
 use std::str::FromStr;
 
-mod error;
+pub mod error;
 mod request;
 mod response;
 
-pub use self::error::BeanstalkError;
+use self::error::{BeanstalkError, Put};
 pub use self::request::Request;
 pub use self::response::Response;
 
@@ -71,7 +71,7 @@ impl CommandCodec {
                 return Ok(Some(Job {
                     id: pre.id,
                     bytes: pre.bytes,
-                    data: String::from(line[0]),
+                    data: line[0].as_bytes().to_vec(),
                 }));
             }
         }
@@ -131,9 +131,7 @@ impl Encoder for CommandCodec {
     type Error = failure::Error;
 
     fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        let format_string = format!("{}", item);
-        dst.reserve(format_string.len());
-        dst.put(format_string.as_bytes());
+        item.serialize(dst);
         Ok(())
     }
 }
