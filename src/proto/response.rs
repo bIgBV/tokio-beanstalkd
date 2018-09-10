@@ -27,13 +27,6 @@ pub enum Response {
     Deleted,
     Watching,
     NotIgnored,
-    BadFormat,
-    ExpectedCLRF,
-    JobTooBig,
-    Draining,
-    OutOfMemory,
-    InternalError,
-    UnknownCommand,
 
     ConnectionClosed,
     // Custom type used for reserved job response parsing.

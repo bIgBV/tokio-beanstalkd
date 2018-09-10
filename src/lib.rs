@@ -11,6 +11,9 @@ use tokio::prelude::*;
 
 use std::net::SocketAddr;
 
+pub use proto::Request;
+pub use proto::Response;
+
 pub struct Beanstalkd {
     connection: Framed<tokio::net::TcpStream, proto::CommandCodec>,
 }
@@ -42,13 +45,12 @@ impl Beanstalkd {
                 ttr,
                 data,
             })
-            // TODO proper error handling
             .and_then(|conn| {
                 conn.into_future().then(|val| match val {
                     Ok((Some(val), conn)) => Ok((Beanstalkd { connection: conn }, Ok(val))),
                     // None is only returned when the stream is closed
                     Ok((None, _)) => bail!("Stream closed"),
-                    Err(_) => bail!("Something bad happened"),
+                    Err((e, conn)) => Err(e),
                 })
             })
     }
@@ -64,7 +66,7 @@ impl Beanstalkd {
                     Ok((Some(val), conn)) => Ok((Beanstalkd { connection: conn }, Ok(val))),
                     // None is only returned when the stream is closed
                     Ok((None, _)) => bail!("Stream closed"),
-                    Err(_) => bail!("Something bad happened"),
+                    Err((e, conn)) => Err(e),
                 })
             })
     }

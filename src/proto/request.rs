@@ -1,5 +1,5 @@
 #[derive(Debug)]
-pub(crate) enum Request {
+pub enum Request {
     Put {
         priority: u32,
         delay: u32,
