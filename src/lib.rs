@@ -17,9 +17,9 @@ use tokio::prelude::*;
 use std::borrow::Cow;
 use std::net::SocketAddr;
 
+pub use proto::error;
 pub use proto::Request;
 pub use proto::Response;
-pub use proto::error as error;
 
 macro_rules! handle_response {
     ($input:ident) => {
@@ -112,9 +112,11 @@ impl Beanstalkd {
             })
             .and_then(|conn| {
                 conn.into_future().then(|val| match val {
-                    // Since both release and bury can get BURIED in the response from the server, but 
+                    // Since both release and bury can get BURIED in the response from the server, but
                     // in the case of release, it is an error, handle it appropriately.
-                    Ok((Some(Response::Released), conn)) => Ok((Beanstalkd { connection: conn }, Ok(Response::Released))),
+                    Ok((Some(Response::Released), conn)) => {
+                        Ok((Beanstalkd { connection: conn }, Ok(Response::Released)))
+                    }
                     Ok((Some(Response::Buried), conn)) => Ok((
                         Beanstalkd { connection: conn },
                         Err(failure::Error::from(error::Consumer::Buried)),
@@ -134,6 +136,16 @@ impl Beanstalkd {
     ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error> {
         self.connection
             .send(Request::Touch { id })
+            .and_then(|conn| handle_response!(conn))
+    }
+
+    pub fn bury(
+        self,
+        id: u32,
+        priority: u32,
+    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error> {
+        self.connection
+            .send(Request::Bury { id, priority })
             .and_then(|conn| handle_response!(conn))
     }
 }
@@ -206,6 +218,16 @@ mod tests {
                     })
                     .inspect(|(_, response)| match response {
                         Ok(v) => assert_eq!(*v, Response::Released),
+                        Err(e) => panic!("Got error: {}", e),
+                    })
+                    .and_then(|(bean, _)| bean.reserve())
+                    .and_then(|(bean, response)| match response {
+                        Ok(Response::Reserved(job)) => bean.bury(job.id, 10),
+                        Ok(_) => panic!("Wrong response returned"),
+                        Err(e) => panic!("Got error: {}", e),
+                    })
+                    .inspect(|(_, response)| match response {
+                        Ok(v) => assert_eq!(*v, Response::Buried),
                         Err(e) => panic!("Got error: {}", e),
                     })
                     .and_then(|(bean, _)| {
