@@ -11,7 +11,7 @@ mod request;
 mod response;
 
 use self::error::BeanstalkError;
-pub use self::request::Request;
+pub(crate) use self::request::Request;
 pub use self::response::Response;
 
 use self::response::{Job, PreJob};

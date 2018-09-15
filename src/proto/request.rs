@@ -2,8 +2,9 @@ use bytes::{BufMut, BytesMut};
 use std::borrow::Cow;
 use std::fmt;
 
+/// 
 #[derive(Debug)]
-pub enum Request {
+pub(crate) enum Request {
     Put {
         priority: u32,
         delay: u32,
@@ -35,6 +36,9 @@ pub enum Request {
     Ignore {
         tube: &'static str,
     },
+    Peek {
+        id: super::Id,
+    },
 }
 
 impl Request {
@@ -56,7 +60,8 @@ impl Request {
             | Request::Bury { .. }
             | Request::Touch { .. }
             | Request::Watch { .. }
-            | Request::Ignore { .. } => {}
+            | Request::Ignore { .. }
+            | Request::Peek { .. } => {}
         }
     }
 }
@@ -89,6 +94,7 @@ impl fmt::Display for Request {
             Request::Touch { id } => write!(f, "touch {}\r\n", id),
             Request::Watch { tube } => write!(f, "watch {}\r\n", tube),
             Request::Ignore { tube } => write!(f, "ignore {}\r\n", tube),
+            Request::Peek { id } => write!(f, "peek {}\r\n", id),
         }
     }
 }

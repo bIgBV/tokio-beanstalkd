@@ -26,6 +26,7 @@ pub enum Response {
     NotIgnored,
     Released,
     Touched,
+    Found(Job),
 
     ConnectionClosed,
     // Custom type used for reserved job response parsing.
