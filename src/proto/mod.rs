@@ -20,6 +20,7 @@ pub type Tube = String;
 
 pub type Id = u32;
 
+#[derive(Debug, Clone)]
 pub(crate) struct CommandCodec {
     /// Prefix of outbox that has been sent
     outstart: usize,
@@ -122,6 +123,8 @@ impl Decoder for CommandCodec {
                 let response = self.parse_response(line)?;
 
                 eprintln!("Got response: {:?}", response);
+                // Since the actual job data is on a second line, we need additional parsing
+                // extract it from the buffer.
                 match response {
                     Response::Pre(pre) => {
                         if let Some(job) = self.parse_job(src, pre)? {

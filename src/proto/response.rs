@@ -1,12 +1,15 @@
 //! Response types returned by Beanstalkd
 use std::fmt::{self, Display};
 
+/// This is an internal type which is not returned by tokio-beanstalkd.
+/// It is used when parsing the job data returned by Beanstald.
 #[derive(Debug, PartialEq, Eq)]
 pub struct PreJob {
     pub id: super::Id,
     pub bytes: usize,
 }
 
+/// A job according to Beanstalkd
 #[derive(Debug, PartialEq, Eq)]
 pub struct Job {
     pub id: super::Id,
@@ -14,6 +17,7 @@ pub struct Job {
     pub data: Vec<u8>,
 }
 
+/// The response from Beanstalkd
 #[derive(Debug, PartialEq, Eq)]
 pub enum Response {
     OK,

@@ -2,7 +2,7 @@ use bytes::{BufMut, BytesMut};
 use std::borrow::Cow;
 use std::fmt;
 
-/// 
+/// A Request holds the data to be serialized on to the wire.
 #[derive(Debug)]
 pub(crate) enum Request {
     Put {
@@ -42,6 +42,9 @@ pub(crate) enum Request {
 }
 
 impl Request {
+    /// The serailize method is used to serialize any request containig data. 
+    /// Since the beanstalkd protocol consists af ASCII characters, the 
+    /// actual heavy lifting is done by the `Display` implementation.
     pub(crate) fn serialize(&self, dst: &mut BytesMut) {
         let format_string = format!("{}", &self);
         dst.reserve(format_string.len());
