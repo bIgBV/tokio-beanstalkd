@@ -32,7 +32,7 @@ explicitly create a `tokio::Runtime` and then use `Runtime::block_on`.
 
 A contrived example
 
-```no_run
+```rust
 extern crate tokio;
 #[macro_use]
 extern crate failure;
