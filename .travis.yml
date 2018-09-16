@@ -1,5 +1,9 @@
 language: rust
 dist: trusty
 cache: cargo
+addons:
+  apt:
+    packages:
+      - beanstalkd
 rust:
   - stable

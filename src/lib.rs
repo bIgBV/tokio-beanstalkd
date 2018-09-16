@@ -30,15 +30,13 @@
 //!
 //! ```no_run
 //! extern crate tokio;
-//! #[macro_use]
-//! extern crate failure;
 //! extern crate futures;
 //! extern crate tokio_beanstalkd;
 //!
 //! use tokio::prelude::*;
 //! use tokio_beanstalkd::*;
 //!
-//!  fn consumer_commands() {
+//! # fn consumer_commands() {
 //!      let mut rt = tokio::runtime::Runtime::new().unwrap();
 //!      let bean = rt.block_on(
 //!          Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()).and_then(|bean| {
@@ -116,7 +114,7 @@
 //!      assert!(!bean.is_err());
 //!      drop(bean);
 //!      rt.shutdown_on_idle();
-//!  }
+//! # }
 //! ```
 
 extern crate bytes;
@@ -236,8 +234,7 @@ impl Beanstalkd {
     /// - [Reserved(Job)](enum.Response.html#variant.Reserved)
     pub fn reserve(
         self,
-    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error>
-    {
+    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error> {
         self.connection
             .send(proto::Request::Reserve)
             .and_then(|conn| handle_response!(conn))
@@ -256,8 +253,7 @@ impl Beanstalkd {
     pub fn using(
         self,
         tube: &'static str,
-    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error>
-    {
+    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error> {
         self.connection
             .send(Request::Use { tube })
             .and_then(|conn| handle_response!(conn))
@@ -276,8 +272,7 @@ impl Beanstalkd {
     pub fn delete(
         self,
         id: u32,
-    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error>
-    {
+    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error> {
         self.connection
             .send(Request::Delete { id })
             .and_then(|conn| handle_response!(conn))
@@ -414,20 +409,36 @@ impl Beanstalkd {
 
 #[cfg(test)]
 mod tests {
-    // TODO: spawn a separate process for beanstalkd so the tests don't depend on anything else.
     use super::*;
+    use std::process::Command;
+
+    static mut SPAWNED: bool = false;
+
+    // Simple function to make sure only one instance of beanstalkd is spawned.
+    // Really sketchy..
+    unsafe fn spawn_beanstalkd() {
+        if !SPAWNED {
+            Command::new("beanstalkd")
+                .spawn()
+                .expect("Unable to spawn server");
+            SPAWNED = true;
+        }
+    }
 
     #[test]
     fn it_works() {
+        unsafe {
+            spawn_beanstalkd();
+        }
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         let bean = rt.block_on(
             Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()).and_then(|bean| {
                 // Let put a job in
-                bean.put(0, 1, 1, &b"data"[..])
+                bean.put(0, 1, 100, &b"data"[..])
                     .inspect(|(_, response)| assert!(response.is_ok()))
                     .and_then(|(bean, _)| {
                         // how about another one?
-                        bean.put(0, 1, 1, &b"more data"[..])
+                        bean.put(0, 1, 100, &b"more data"[..])
                     })
                     .inspect(|(_, response)| assert!(response.is_ok()))
                     .and_then(|(bean, _)| {
@@ -447,10 +458,13 @@ mod tests {
 
     #[test]
     fn consumer_commands() {
+        unsafe {
+            spawn_beanstalkd();
+        }
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         let bean = rt.block_on(
             Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()).and_then(|bean| {
-                bean.put(0, 1, 1, &b"data"[..])
+                bean.put(0, 1, 100, &b"data"[..])
                     .inspect(|(_, response)| assert!(response.is_ok()))
                     .and_then(|(bean, _)| bean.reserve())
                     .inspect(|(_, response)| match response {
@@ -470,7 +484,7 @@ mod tests {
                     })
                     .and_then(|(bean, _)| {
                         // how about another one?
-                        bean.put(0, 1, 1, &b"more data"[..])
+                        bean.put(0, 1, 100, &b"more data"[..])
                     })
                     .and_then(|(bean, _)| bean.reserve())
                     .and_then(|(bean, response)| match response {
@@ -494,7 +508,7 @@ mod tests {
                     })
                     .and_then(|(bean, _)| {
                         // how about another one?
-                        bean.put(0, 1, 1, &b"more data"[..])
+                        bean.put(0, 1, 100, &b"more data"[..])
                     })
                     .inspect(|(_, response)| assert!(response.is_ok()))
                     .and_then(|(bean, response)| match response {

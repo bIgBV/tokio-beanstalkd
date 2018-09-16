@@ -3,6 +3,8 @@
 This crate provides a client for working with [Beanstalkd](https://beanstalkd.github.io/), a simple
 fast work queue.
 
+[![Build Status](https://travis-ci.org/bIgBV/tokio-beanstalkd.svg?branch=master)](https://travis-ci.org/bIgBV/tokio-beanstalkd)
+
 # About Beanstalkd
 
 Beanstalkd is a simple fast work queue. It works at the TCP connection level, considering each TCP
