@@ -4,6 +4,8 @@ This crate provides a client for working with [Beanstalkd](https://beanstalkd.gi
 fast work queue.
 
 [![Build Status](https://travis-ci.org/bIgBV/tokio-beanstalkd.svg?branch=master)](https://travis-ci.org/bIgBV/tokio-beanstalkd)
+[![Crates.io](https://img.shields.io/crates/v/tokio-beanstalkd.svg)](https://crates.io/crates/tokio-beanstalkd)
+[![Documentation](https://docs.rs/tokio-beanstalkd/badge.svg)](https://docs.rs/tokio-beanstalkd/)
 
 # About Beanstalkd
 
