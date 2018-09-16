@@ -2,6 +2,7 @@
 //! fast work queue.
 //
 //! # About Beanstalkd
+//!
 //! Beanstalkd is a simple fast work queue. It works at the TCP connection level, considering each TCP
 //! connection individually. A worker may have multiple connections to the Beanstalkd server and each
 //! connection will be considered separate.
@@ -9,7 +10,7 @@
 //! The protocol is ASCII text based but the data itself is just a bytestream. This means that the
 //! application is responsible for interpreting the data.
 //!
-//! # Operation
+//! ## Operation
 //! This library can serve as a client for both the application and the worker. The application would
 //! `put` jobs on the queue and the workers can `reserve` them. Once they are done with the job, they
 //! have to `delete` job. This is required for every job, or else beanstlkd will not remove it from
@@ -19,7 +20,7 @@
 //! application can use the `using` method to put jobs in a specific tube, and workers can use `watch`
 //! to only reserve jobs from the specified tubes.
 //!
-//! # Interaction with Tokio
+//! ## Interaction with Tokio
 //!
 //! The futures in this crate expect to be running under a `tokio::Runtime`. In the common case,
 //! you cannot resolve them solely using `.wait()`, but should instead use `tokio::run` or
