@@ -1,0 +1,5 @@
+language: rust
+dist: trusty
+cache: cargo
+rust:
+  - stable
