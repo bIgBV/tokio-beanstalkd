@@ -1,6 +1,6 @@
 [package]
 name = "tokio-beanstalkd"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Bhargav Voleti <bhargav.voleti93@gmail.com>"]
 
 description = "Asynchronous client library for interacting with Beanstalkd work queue."
