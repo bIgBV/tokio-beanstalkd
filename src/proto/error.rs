@@ -29,6 +29,11 @@ pub enum BeanstalkError {
 /// Errors which can be casued due to a PUT command
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Fail)]
 pub enum Put {
+    /// The server ran out of memory trying to grow the priority queue data structure.
+    /// The client should try another server or disconnect and try again later.
+    #[fail(display = "Server had to bury the request")]
+    Buried,
+
     /// The job body must be followed by a CR-LF pair, that is, "\r\n". These two bytes are not counted
     /// in the job size given by the client in the put command line.
     ///

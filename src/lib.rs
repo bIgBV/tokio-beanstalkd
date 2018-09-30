@@ -40,74 +40,39 @@
 //!      let mut rt = tokio::runtime::Runtime::new().unwrap();
 //!      let bean = rt.block_on(
 //!          Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()).and_then(|bean| {
-//!              bean.put(0, 1, 1, &b"data"[..])
-//!                  .inspect(|(_, response)| assert!(response.is_ok()))
-//!                  .and_then(|(bean, _)| bean.reserve())
-//!                  .inspect(|(_, response)| match response {
-//!                      Ok(Response::Reserved(j)) => {
-//!                          assert_eq!(j.data, b"data");
-//!                      }
-//!                      _ => panic!("Wrong response received"),
-//!                  })
-//!                  .and_then(|(bean, response)| match response {
-//!                      Ok(Response::Reserved(j)) => bean.touch(j.id),
-//!                      Ok(_) => panic!("Wrong response returned"),
-//!                      Err(e) => panic!("Got error: {}", e),
-//!                  })
-//!                  .inspect(|(_, response)| match response {
-//!                      Ok(v) => assert_eq!(*v, Response::Touched),
-//!                      Err(e) => panic!("Got error: {}", e),
-//!                  })
-//!                  .and_then(|(bean, _)| {
+//!              bean.put(0, 1, 100, &b"data"[..])
+//!                  .inspect(|(_, response)| {
+//!                      response.as_ref().unwrap();
+//!                  }).and_then(|(bean, _)| bean.reserve())
+//!                  .inspect(|(_, response)| assert_eq!(response.as_ref().unwrap().data, b"data"))
+//!                  .and_then(|(bean, response)| bean.touch(response.unwrap().id))
+//!                  .inspect(|(_, response)| {
+//!                      response.as_ref().unwrap();
+//!                  }).and_then(|(bean, _)| {
 //!                      // how about another one?
-//!                      bean.put(0, 1, 1, &b"more data"[..])
-//!                  })
-//!                  .and_then(|(bean, _)| bean.reserve())
-//!                  .and_then(|(bean, response)| match response {
-//!                      Ok(Response::Reserved(job)) => bean.release(job.id, 10, 10),
-//!                      Ok(_) => panic!("Wrong response returned"),
-//!                      Err(e) => panic!("Got error: {}", e),
-//!                  })
-//!                  .inspect(|(_, response)| match response {
-//!                      Ok(v) => assert_eq!(*v, Response::Released),
-//!                      Err(e) => panic!("Got error: {}", e),
-//!                  })
-//!                  .and_then(|(bean, _)| bean.reserve())
-//!                  .and_then(|(bean, response)| match response {
-//!                      Ok(Response::Reserved(job)) => bean.bury(job.id, 10),
-//!                      Ok(_) => panic!("Wrong response returned"),
-//!                      Err(e) => panic!("Got error: {}", e),
-//!                  })
-//!                  .inspect(|(_, response)| match response {
-//!                      Ok(v) => assert_eq!(*v, Response::Buried),
-//!                      Err(e) => panic!("Got error: {}", e),
-//!                  })
-//!                  .and_then(|(bean, _)| {
+//!                      bean.put(0, 1, 100, &b"more data"[..])
+//!                  }).and_then(|(bean, _)| bean.reserve())
+//!                  .and_then(|(bean, response)| bean.release(response.unwrap().id, 10, 10))
+//!                  .inspect(|(_, response)| {
+//!                      response.as_ref().unwrap();
+//!                  }).and_then(|(bean, _)| bean.reserve())
+//!                  .and_then(|(bean, response)| bean.bury(response.unwrap().id, 10))
+//!                  .inspect(|(_, response)| {
+//!                      response.as_ref().unwrap();
+//!                  }).and_then(|(bean, _)| {
 //!                      // how about another one?
-//!                      bean.put(0, 1, 1, &b"more data"[..])
-//!                  })
-//!                  .inspect(|(_, response)| assert!(response.is_ok()))
-//!                  .and_then(|(bean, response)| match response {
-//!                      Ok(Response::Inserted(id)) => bean.delete(id),
-//!                      Ok(_) => panic!("Wrong response returned"),
-//!                      Err(e) => panic!("Got error: {}", e),
-//!                  })
-//!                  .inspect(|(_, response)| match response {
-//!                      Ok(v) => assert_eq!(*v, Response::Deleted),
-//!                      Err(e) => {
-//!                          // assert_eq!(*e, error::Consumer::NotFound);
-//!                          panic!("Got error: {}", e)
-//!                      }
-//!                  })
-//!                  .and_then(|(bean, _)| bean.watch("test"))
-//!                  .inspect(|(_, response)| match response {
-//!                      Ok(v) => assert_eq!(*v, Response::Watching(2)),
-//!                      Err(e) => panic!("Got error: {}", e),
-//!                  })
+//!                      bean.put(0, 1, 100, &b"more data"[..])
+//!                  }).inspect(|(_, response)| {
+//!                      response.as_ref().unwrap();
+//!                  }).and_then(|(bean, response)| bean.delete(response.unwrap()))
+//!                  .inspect(|(_, response)| {
+//!                      // assert_eq!(*e, error::Consumer::NotFound);
+//!                      response.as_ref().unwrap();
+//!                  }).and_then(|(bean, _)| bean.watch("test"))
+//!                  .inspect(|(_, response)| assert_eq!(*response.as_ref().unwrap(), 2))
 //!                  .and_then(|(bean, _)| bean.ignore("test"))
-//!                  .inspect(|(_, response)| match response {
-//!                      Ok(v) => assert_eq!(*v, Response::Watching(1)),
-//!                      Err(e) => panic!("Got error: {}", e),
+//!                  .inspect(|(_, response)| {
+//!                      assert_eq!(response.as_ref().unwrap(), &IgnoreResponse::Watching(1))
 //!                  })
 //!          }),
 //!      );
@@ -132,14 +97,15 @@ use std::borrow::Cow;
 use std::net::SocketAddr;
 
 pub use proto::error;
-pub use proto::Response;
+pub use proto::response::*;
+pub use proto::{Id, Tube};
 // Request doesn't have to be a public type
 use proto::Request;
 
 macro_rules! handle_response {
-    ($input:ident) => {
+    ($input:ident, $mapping:tt) => {
         $input.into_future().then(|val| match val {
-            Ok((Some(val), conn)) => Ok((Beanstalkd { connection: conn }, Ok(val))),
+            Ok((Some(val), conn)) => Ok((Beanstalkd { connection: conn }, match val $mapping)),
             // None is only returned when the stream is closed
             Ok((None, _)) => bail!("Stream closed"),
             Err((e, conn)) => Ok((Beanstalkd { connection: conn }, Err(e))),
@@ -196,18 +162,14 @@ impl Beanstalkd {
     ///   previous line.
     ///
     /// After sending the command line and body, the client waits for a reply, which
-    /// may be:
-    ///
-    ///  - [Inserted(Id)](enum.Response.html#variant.Inserted) to indicate success.
-    ///
-    ///    - <id> is the integer id of the new job
+    /// is the integer id of the new job.
     pub fn put<D>(
         self,
         priority: u32,
         delay: u32,
         ttr: u32,
         data: D,
-    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error>
+    ) -> impl Future<Item = (Self, Result<Id, failure::Error>), Error = failure::Error>
     where
         D: Into<Cow<'static, [u8]>>,
     {
@@ -218,25 +180,32 @@ impl Beanstalkd {
                 delay,
                 ttr,
                 data,
-            }).and_then(|conn| handle_response!(conn))
+            }).and_then(|conn| {
+                handle_response!(conn, {
+                    AnyResponse::Inserted(id) => Ok(id),
+                    AnyResponse::Buried => Err(failure::Error::from(error::Put::Buried)),
+                    r => Err(format_err!("got unexpected PUT response {:?}", r))
+                })
+            })
     }
 
-    /// Reserve a job to process.
+    /// Reserve a [job](struct.Job.html) to process.
     ///
     /// A process that wants to consume jobs from the queue uses `reserve`,
     /// [delete](struct.Beanstalkd.html#method.delete),
     /// [release](struct.Beanstalkd.html#method.release), and
     /// [bury](struct.Beanstalkd.html#method.bury).
-    ///
-    /// The only successful response to this command is a successful reservation:
-    ///
-    /// - [Reserved(Job)](enum.Response.html#variant.Reserved)
     pub fn reserve(
         self,
-    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error> {
+    ) -> impl Future<Item = (Self, Result<Job, failure::Error>), Error = failure::Error> {
         self.connection
             .send(proto::Request::Reserve)
-            .and_then(|conn| handle_response!(conn))
+            .and_then(|conn| {
+                handle_response!(conn, {
+                    AnyResponse::Reserved(job) => Ok(job),
+                    r => Err(format_err!("got unexpected RESERVE response {:?}", r))
+                })
+            })
     }
 
     /// The "use" command is for producers. Subsequent put commands will put jobs into
@@ -245,17 +214,18 @@ impl Beanstalkd {
     ///
     /// - `tube` is a name at most 200 bytes. It specifies the tube to use. If the
     ///   tube does not exist, it will be created.
-    ///
-    /// The only reply is:
-    ///
-    /// - [Using(Tube)](enum.Response.html#variant.Using)
     pub fn using(
         self,
         tube: &'static str,
-    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error> {
+    ) -> impl Future<Item = (Self, Result<Tube, failure::Error>), Error = failure::Error> {
         self.connection
             .send(Request::Use { tube })
-            .and_then(|conn| handle_response!(conn))
+            .and_then(|conn| {
+                handle_response!(conn, {
+                    AnyResponse::Using(tube) => Ok(tube),
+                    r => Err(format_err!("got unexpected USE response {:?}", r))
+                })
+            })
     }
 
     /// The delete command removes a job from the server entirely. It is normally used
@@ -264,17 +234,18 @@ impl Beanstalkd {
     /// buried.
     ///
     ///  - `id` is the job id to delete.
-    ///
-    /// A successful response is:
-    ///
-    /// - [Deleted](enum.Response.html#variant.Deleted)
     pub fn delete(
         self,
         id: u32,
-    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error> {
+    ) -> impl Future<Item = (Self, Result<(), failure::Error>), Error = failure::Error> {
         self.connection
             .send(Request::Delete { id })
-            .and_then(|conn| handle_response!(conn))
+            .and_then(|conn| {
+                handle_response!(conn, {
+                    AnyResponse::Deleted => Ok(()),
+                    r => Err(format_err!("got unexpected DELETE response {:?}", r))
+                })
+            })
     }
 
     /// The release command puts a reserved job back into the ready queue (and marks
@@ -287,30 +258,25 @@ impl Beanstalkd {
     ///
     /// - `delay` is an integer number of seconds to wait before putting the job in
     ///   the ready queue. The job will be in the "delayed" state during this time.
-    ///
-    /// The successful response is:
-    ///
-    /// - [Released](enum.Response.html#variant.Released)
     pub fn release(
         self,
         id: u32,
         priority: u32,
         delay: u32,
-    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error> {
+    ) -> impl Future<Item = (Self, Result<(), failure::Error>), Error = failure::Error> {
         self.connection
             .send(Request::Release {
                 id,
                 priority,
                 delay,
-            })
-            .and_then(|conn| {
+            }).and_then(|conn| {
                 conn.into_future().then(|val| match val {
                     // Since both release and bury can get BURIED in the response from the server, but
                     // in the case of release, it is an error, handle it appropriately.
-                    Ok((Some(Response::Released), conn)) => {
-                        Ok((Beanstalkd { connection: conn }, Ok(Response::Released)))
+                    Ok((Some(AnyResponse::Released), conn)) => {
+                        Ok((Beanstalkd { connection: conn }, Ok(())))
                     }
-                    Ok((Some(Response::Buried), conn)) => Ok((
+                    Ok((Some(AnyResponse::Buried), conn)) => Ok((
                         Beanstalkd { connection: conn },
                         Err(failure::Error::from(error::Consumer::Buried)),
                     )),
@@ -331,17 +297,18 @@ impl Beanstalkd {
     /// release of a reserved job until TTR seconds from when the command is issued.
     ///
     /// - `id` is the ID of a job reserved by the current connection.
-    ///
-    /// A successful response is:
-    ///
-    /// - [Touched](enum.Response.html#variant.Touched)
     pub fn touch(
         self,
         id: u32,
-    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error> {
+    ) -> impl Future<Item = (Self, Result<(), failure::Error>), Error = failure::Error> {
         self.connection
             .send(Request::Touch { id })
-            .and_then(|conn| handle_response!(conn))
+            .and_then(|conn| {
+                handle_response!(conn, {
+                    AnyResponse::Touched => Ok(()),
+                    r => Err(format_err!("got unexpected TOUCH response {:?}", r))
+                })
+            })
     }
 
     /// The bury command puts a job into the "buried" state. Buried jobs are put into a
@@ -351,18 +318,19 @@ impl Beanstalkd {
     ///  - `id` is the job id to release.
     ///
     /// - `prioritiy` is a new priority to assign to the job.
-    ///
-    /// The successful response is:
-    ///
-    /// - [Buried(Id)](enum.Response.html#variant.Buried)
     pub fn bury(
         self,
         id: u32,
         priority: u32,
-    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error> {
+    ) -> impl Future<Item = (Self, Result<(), failure::Error>), Error = failure::Error> {
         self.connection
             .send(Request::Bury { id, priority })
-            .and_then(|conn| handle_response!(conn))
+            .and_then(|conn| {
+                handle_response!(conn, {
+                    AnyResponse::Buried => Ok(()),
+                    r => Err(format_err!("got unexpected BURY response {:?}", r))
+                })
+            })
     }
 
     /// The "watch" command adds the named tube to the watch list for the current
@@ -373,17 +341,19 @@ impl Beanstalkd {
     ///  - <tube> is a name at most 200 bytes. It specifies a tube to add to the watch
     ///     list. If the tube doesn't exist, it will be created.
     ///
-    /// A successful response is:
-    ///
-    /// - [Watching(u32)](enum.Response.html#variant.Watching) The value returned is the
-    ///     count of the tubes being watched by the current connection.
+    /// The value returned is the count of the tubes being watched by the current connection.
     pub fn watch(
         self,
         tube: &'static str,
-    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error> {
+    ) -> impl Future<Item = (Self, Result<u32, failure::Error>), Error = failure::Error> {
         self.connection
             .send(Request::Watch { tube })
-            .and_then(|conn| handle_response!(conn))
+            .and_then(|conn| {
+                handle_response!(conn, {
+                    AnyResponse::Watching(n) => Ok(n),
+                    r => Err(format_err!("got unexpected WATCH response {:?}", r))
+                })
+            })
     }
 
     /// The "ignore" command is for consumers. It removes the named tube from the
@@ -394,15 +364,22 @@ impl Beanstalkd {
     ///
     /// A successful response is:
     ///
-    /// - [Watching(u32)](enum.Response.html#variant.Watching) The value returned is the
-    ///     count of the tubes being watched by the current connection.
+    /// - [IgnoreResponse::Watching(u32)](enum.IgnoreResponse.html#variant.Watching)
+    ///   The value returned is the count of the tubes being watched by the current connection.
     pub fn ignore(
         self,
         tube: &'static str,
-    ) -> impl Future<Item = (Self, Result<Response, failure::Error>), Error = failure::Error> {
+    ) -> impl Future<Item = (Self, Result<IgnoreResponse, failure::Error>), Error = failure::Error>
+    {
         self.connection
             .send(Request::Ignore { tube })
-            .and_then(|conn| handle_response!(conn))
+            .and_then(|conn| {
+                handle_response!(conn, {
+                    AnyResponse::Watching(n) => Ok(IgnoreResponse::Watching(n)),
+                    AnyResponse::NotIgnored => Ok(IgnoreResponse::NotIgnored),
+                    r => Err(format_err!("got unexpected IGNORE response {:?}", r))
+                })
+            })
     }
 }
 
@@ -443,7 +420,7 @@ mod tests {
                         // Let's watch a particular tube
                         bean.using("test")
                     }).inspect(|(_, response)| match response {
-                        Ok(v) => assert_eq!(*v, Response::Using("test".to_string())),
+                        Ok(v) => assert_eq!(v, "test"),
                         Err(e) => panic!("Unexpected error: {}", e),
                     })
             }),
@@ -462,61 +439,38 @@ mod tests {
         let bean = rt.block_on(
             Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()).and_then(|bean| {
                 bean.put(0, 1, 100, &b"data"[..])
-                    .inspect(|(_, response)| assert!(response.is_ok()))
-                    .and_then(|(bean, _)| bean.reserve())
-                    .inspect(|(_, response)| match response {
-                        Ok(Response::Reserved(j)) => {
-                            assert_eq!(j.data, b"data");
-                        }
-                        _ => panic!("Wrong response received"),
-                    }).and_then(|(bean, response)| match response {
-                        Ok(Response::Reserved(j)) => bean.touch(j.id),
-                        Ok(_) => panic!("Wrong response returned"),
-                        Err(e) => panic!("Got error: {}", e),
-                    }).inspect(|(_, response)| match response {
-                        Ok(v) => assert_eq!(*v, Response::Touched),
-                        Err(e) => panic!("Got error: {}", e),
+                    .inspect(|(_, response)| {
+                        response.as_ref().unwrap();
+                    }).and_then(|(bean, _)| bean.reserve())
+                    .inspect(|(_, response)| assert_eq!(response.as_ref().unwrap().data, b"data"))
+                    .and_then(|(bean, response)| bean.touch(response.unwrap().id))
+                    .inspect(|(_, response)| {
+                        response.as_ref().unwrap();
                     }).and_then(|(bean, _)| {
                         // how about another one?
                         bean.put(0, 1, 100, &b"more data"[..])
                     }).and_then(|(bean, _)| bean.reserve())
-                    .and_then(|(bean, response)| match response {
-                        Ok(Response::Reserved(job)) => bean.release(job.id, 10, 10),
-                        Ok(_) => panic!("Wrong response returned"),
-                        Err(e) => panic!("Got error: {}", e),
-                    }).inspect(|(_, response)| match response {
-                        Ok(v) => assert_eq!(*v, Response::Released),
-                        Err(e) => panic!("Got error: {}", e),
+                    .and_then(|(bean, response)| bean.release(response.unwrap().id, 10, 10))
+                    .inspect(|(_, response)| {
+                        response.as_ref().unwrap();
                     }).and_then(|(bean, _)| bean.reserve())
-                    .and_then(|(bean, response)| match response {
-                        Ok(Response::Reserved(job)) => bean.bury(job.id, 10),
-                        Ok(_) => panic!("Wrong response returned"),
-                        Err(e) => panic!("Got error: {}", e),
-                    }).inspect(|(_, response)| match response {
-                        Ok(v) => assert_eq!(*v, Response::Buried),
-                        Err(e) => panic!("Got error: {}", e),
+                    .and_then(|(bean, response)| bean.bury(response.unwrap().id, 10))
+                    .inspect(|(_, response)| {
+                        response.as_ref().unwrap();
                     }).and_then(|(bean, _)| {
                         // how about another one?
                         bean.put(0, 1, 100, &b"more data"[..])
-                    }).inspect(|(_, response)| assert!(response.is_ok()))
-                    .and_then(|(bean, response)| match response {
-                        Ok(Response::Inserted(id)) => bean.delete(id),
-                        Ok(_) => panic!("Wrong response returned"),
-                        Err(e) => panic!("Got error: {}", e),
-                    }).inspect(|(_, response)| match response {
-                        Ok(v) => assert_eq!(*v, Response::Deleted),
-                        Err(e) => {
-                            // assert_eq!(*e, error::Consumer::NotFound);
-                            panic!("Got error: {}", e)
-                        }
+                    }).inspect(|(_, response)| {
+                        response.as_ref().unwrap();
+                    }).and_then(|(bean, response)| bean.delete(response.unwrap()))
+                    .inspect(|(_, response)| {
+                        // assert_eq!(*e, error::Consumer::NotFound);
+                        response.as_ref().unwrap();
                     }).and_then(|(bean, _)| bean.watch("test"))
-                    .inspect(|(_, response)| match response {
-                        Ok(v) => assert_eq!(*v, Response::Watching(2)),
-                        Err(e) => panic!("Got error: {}", e),
-                    }).and_then(|(bean, _)| bean.ignore("test"))
-                    .inspect(|(_, response)| match response {
-                        Ok(v) => assert_eq!(*v, Response::Watching(1)),
-                        Err(e) => panic!("Got error: {}", e),
+                    .inspect(|(_, response)| assert_eq!(*response.as_ref().unwrap(), 2))
+                    .and_then(|(bean, _)| bean.ignore("test"))
+                    .inspect(|(_, response)| {
+                        assert_eq!(response.as_ref().unwrap(), &IgnoreResponse::Watching(1))
                     })
             }),
         );

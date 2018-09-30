@@ -1,5 +1,4 @@
 //! Response types returned by Beanstalkd
-use std::fmt::{self, Display};
 
 /// This is an internal type which is not returned by tokio-beanstalkd.
 /// It is used when parsing the job data returned by Beanstald.
@@ -17,10 +16,17 @@ pub struct Job {
     pub data: Vec<u8>,
 }
 
-/// The response from Beanstalkd
+/// A response to an IGNORE command.
 #[derive(Debug, PartialEq, Eq)]
-pub enum Response {
-    OK,
+pub enum IgnoreResponse {
+    /// The integer number of tubes currently left in the watch list.
+    Watching(u32),
+    /// The client attempted to ignore the only tube in its watch list.
+    NotIgnored,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum AnyResponse {
     Reserved(Job),
     Inserted(super::Id),
     Buried,
@@ -35,10 +41,4 @@ pub enum Response {
     ConnectionClosed,
     // Custom type used for reserved job response parsing.
     Pre(PreJob),
-}
-
-impl Display for Response {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(self, f)
-    }
 }
