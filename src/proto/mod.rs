@@ -58,7 +58,7 @@ impl CommandCodec {
                 "INSERTED" => {
                     let id = FromStr::from_str(list[1])?;
                     Ok(Response::Inserted(id))
-                },
+                }
                 "WATCHING" => {
                     let count = FromStr::from_str(list[1])?;
                     Ok(Response::Watching(count))
@@ -161,7 +161,7 @@ impl Encoder for CommandCodec {
                     bail!("Tube name too long")
                 }
                 item.serialize(dst)
-            },
+            }
             _ => item.serialize(dst),
         }
         Ok(())

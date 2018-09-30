@@ -218,8 +218,7 @@ impl Beanstalkd {
                 delay,
                 ttr,
                 data,
-            })
-            .and_then(|conn| handle_response!(conn))
+            }).and_then(|conn| handle_response!(conn))
     }
 
     /// Reserve a job to process.
@@ -439,13 +438,11 @@ mod tests {
                     .and_then(|(bean, _)| {
                         // how about another one?
                         bean.put(0, 1, 100, &b"more data"[..])
-                    })
-                    .inspect(|(_, response)| assert!(response.is_ok()))
+                    }).inspect(|(_, response)| assert!(response.is_ok()))
                     .and_then(|(bean, _)| {
                         // Let's watch a particular tube
                         bean.using("test")
-                    })
-                    .inspect(|(_, response)| match response {
+                    }).inspect(|(_, response)| match response {
                         Ok(v) => assert_eq!(*v, Response::Using("test".to_string())),
                         Err(e) => panic!("Unexpected error: {}", e),
                     })
@@ -472,63 +469,51 @@ mod tests {
                             assert_eq!(j.data, b"data");
                         }
                         _ => panic!("Wrong response received"),
-                    })
-                    .and_then(|(bean, response)| match response {
+                    }).and_then(|(bean, response)| match response {
                         Ok(Response::Reserved(j)) => bean.touch(j.id),
                         Ok(_) => panic!("Wrong response returned"),
                         Err(e) => panic!("Got error: {}", e),
-                    })
-                    .inspect(|(_, response)| match response {
+                    }).inspect(|(_, response)| match response {
                         Ok(v) => assert_eq!(*v, Response::Touched),
                         Err(e) => panic!("Got error: {}", e),
-                    })
-                    .and_then(|(bean, _)| {
+                    }).and_then(|(bean, _)| {
                         // how about another one?
                         bean.put(0, 1, 100, &b"more data"[..])
-                    })
-                    .and_then(|(bean, _)| bean.reserve())
+                    }).and_then(|(bean, _)| bean.reserve())
                     .and_then(|(bean, response)| match response {
                         Ok(Response::Reserved(job)) => bean.release(job.id, 10, 10),
                         Ok(_) => panic!("Wrong response returned"),
                         Err(e) => panic!("Got error: {}", e),
-                    })
-                    .inspect(|(_, response)| match response {
+                    }).inspect(|(_, response)| match response {
                         Ok(v) => assert_eq!(*v, Response::Released),
                         Err(e) => panic!("Got error: {}", e),
-                    })
-                    .and_then(|(bean, _)| bean.reserve())
+                    }).and_then(|(bean, _)| bean.reserve())
                     .and_then(|(bean, response)| match response {
                         Ok(Response::Reserved(job)) => bean.bury(job.id, 10),
                         Ok(_) => panic!("Wrong response returned"),
                         Err(e) => panic!("Got error: {}", e),
-                    })
-                    .inspect(|(_, response)| match response {
+                    }).inspect(|(_, response)| match response {
                         Ok(v) => assert_eq!(*v, Response::Buried),
                         Err(e) => panic!("Got error: {}", e),
-                    })
-                    .and_then(|(bean, _)| {
+                    }).and_then(|(bean, _)| {
                         // how about another one?
                         bean.put(0, 1, 100, &b"more data"[..])
-                    })
-                    .inspect(|(_, response)| assert!(response.is_ok()))
+                    }).inspect(|(_, response)| assert!(response.is_ok()))
                     .and_then(|(bean, response)| match response {
                         Ok(Response::Inserted(id)) => bean.delete(id),
                         Ok(_) => panic!("Wrong response returned"),
                         Err(e) => panic!("Got error: {}", e),
-                    })
-                    .inspect(|(_, response)| match response {
+                    }).inspect(|(_, response)| match response {
                         Ok(v) => assert_eq!(*v, Response::Deleted),
                         Err(e) => {
                             // assert_eq!(*e, error::Consumer::NotFound);
                             panic!("Got error: {}", e)
                         }
-                    })
-                    .and_then(|(bean, _)| bean.watch("test"))
+                    }).and_then(|(bean, _)| bean.watch("test"))
                     .inspect(|(_, response)| match response {
                         Ok(v) => assert_eq!(*v, Response::Watching(2)),
                         Err(e) => panic!("Got error: {}", e),
-                    })
-                    .and_then(|(bean, _)| bean.ignore("test"))
+                    }).and_then(|(bean, _)| bean.ignore("test"))
                     .inspect(|(_, response)| match response {
                         Ok(v) => assert_eq!(*v, Response::Watching(1)),
                         Err(e) => panic!("Got error: {}", e),

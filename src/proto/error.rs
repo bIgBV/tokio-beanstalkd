@@ -55,6 +55,6 @@ pub enum Consumer {
     #[fail(display = "Job got buried")]
     Buried,
     /// If the client attempts to ignore the only tube in its watch list.
-    #[fail(display="Tried to ignore the only tube being watched")]
-    NotIgnored
+    #[fail(display = "Tried to ignore the only tube being watched")]
+    NotIgnored,
 }
