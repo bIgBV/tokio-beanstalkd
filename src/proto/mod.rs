@@ -8,11 +8,11 @@ use std::str::FromStr;
 
 pub mod error;
 mod request;
-mod response;
+pub(crate) mod response;
 
 use self::error::BeanstalkError;
 pub(crate) use self::request::Request;
-pub use self::response::Response;
+pub use self::response::*;
 
 use self::response::{Job, PreJob};
 
@@ -31,7 +31,7 @@ impl CommandCodec {
         CommandCodec { outstart: 0 }
     }
 
-    fn parse_response(&self, list: Vec<&str>) -> Result<Response, failure::Error> {
+    fn parse_response(&self, list: Vec<&str>) -> Result<AnyResponse, failure::Error> {
         eprintln!("Parsing: {:?}", list);
         if list.len() == 1 {
             return match list[0] {
@@ -44,10 +44,10 @@ impl CommandCodec {
                 "DRAINING" => Err(failure::Error::from(error::Put::Draining)),
                 "NOT_FOUND" => Err(failure::Error::from(error::Consumer::NotFound)),
                 "NOT_IGNORED" => Err(failure::Error::from(error::Consumer::NotIgnored)),
-                "BURIED" => Ok(Response::Buried),
-                "TOUCHED" => Ok(Response::Touched),
-                "RELEASED" => Ok(Response::Released),
-                "DELETED" => Ok(Response::Deleted),
+                "BURIED" => Ok(AnyResponse::Buried),
+                "TOUCHED" => Ok(AnyResponse::Touched),
+                "RELEASED" => Ok(AnyResponse::Released),
+                "DELETED" => Ok(AnyResponse::Deleted),
                 _ => bail!("Unknown response from server"),
             };
         }
@@ -57,20 +57,20 @@ impl CommandCodec {
             return match list[0] {
                 "INSERTED" => {
                     let id = FromStr::from_str(list[1])?;
-                    Ok(Response::Inserted(id))
-                },
+                    Ok(AnyResponse::Inserted(id))
+                }
                 "WATCHING" => {
                     let count = FromStr::from_str(list[1])?;
-                    Ok(Response::Watching(count))
+                    Ok(AnyResponse::Watching(count))
                 }
-                "USING" => Ok(Response::Using(String::from(list[1]))),
+                "USING" => Ok(AnyResponse::Using(String::from(list[1]))),
                 _ => bail!("Unknown resonse from server"),
             };
         }
 
         if list.len() == 3 {
             return match list[0] {
-                "RESERVED" => Ok(Response::Pre(parse_pre_job(list[1..].to_vec())?)),
+                "RESERVED" => Ok(AnyResponse::Pre(parse_pre_job(list[1..].to_vec())?)),
                 _ => bail!("Unknown response from server."),
             };
         }
@@ -106,7 +106,7 @@ fn parse_pre_job(list: Vec<&str>) -> Result<PreJob, failure::Error> {
 }
 
 impl Decoder for CommandCodec {
-    type Item = Response;
+    type Item = AnyResponse;
     type Error = failure::Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
@@ -126,11 +126,11 @@ impl Decoder for CommandCodec {
                 // Since the actual job data is on a second line, we need additional parsing
                 // extract it from the buffer.
                 match response {
-                    Response::Pre(pre) => {
+                    AnyResponse::Pre(pre) => {
                         if let Some(job) = self.parse_job(src, pre)? {
                             self.outstart = 0;
                             src.clear();
-                            return Ok(Some(Response::Reserved(job)));
+                            return Ok(Some(AnyResponse::Reserved(job)));
                         } else {
                             return Ok(None);
                         }
@@ -161,7 +161,7 @@ impl Encoder for CommandCodec {
                     bail!("Tube name too long")
                 }
                 item.serialize(dst)
-            },
+            }
             _ => item.serialize(dst),
         }
         Ok(())

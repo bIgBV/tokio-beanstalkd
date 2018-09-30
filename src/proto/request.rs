@@ -42,8 +42,8 @@ pub(crate) enum Request {
 }
 
 impl Request {
-    /// The serailize method is used to serialize any request containig data. 
-    /// Since the beanstalkd protocol consists af ASCII characters, the 
+    /// The serailize method is used to serialize any request containig data.
+    /// Since the beanstalkd protocol consists af ASCII characters, the
     /// actual heavy lifting is done by the `Display` implementation.
     pub(crate) fn serialize(&self, dst: &mut BytesMut) {
         let format_string = format!("{}", &self);
