@@ -16,15 +16,6 @@ pub struct Job {
     pub data: Vec<u8>,
 }
 
-/// A response to an IGNORE command.
-#[derive(Debug, PartialEq, Eq)]
-pub enum IgnoreResponse {
-    /// The integer number of tubes currently left in the watch list.
-    Watching(u32),
-    /// The client attempted to ignore the only tube in its watch list.
-    NotIgnored,
-}
-
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum AnyResponse {
     Reserved(Job),
