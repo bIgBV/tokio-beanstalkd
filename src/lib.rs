@@ -79,7 +79,7 @@
 //!                  .inspect(|(_, response)| assert_eq!(*response.as_ref().unwrap(), 2))
 //!                  .and_then(|(bean, _)| bean.ignore("test"))
 //!                  .inspect(|(_, response)| {
-//!                      assert_eq!(response.as_ref().unwrap(), &IgnoreResponse::Watching(1))
+//!                      assert_eq!(*response.as_ref().unwrap(), 1)
 //!                  })
 //!          }),
 //!      );
@@ -462,17 +462,18 @@ impl Beanstalkd {
 mod tests {
     use super::*;
     use std::process::Command;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
-    static mut SPAWNED: bool = false;
+    static mut SPAWNED: AtomicBool = AtomicBool::new(false);
 
     // Simple function to make sure only one instance of beanstalkd is spawned.
     // Really sketchy..
     unsafe fn spawn_beanstalkd() {
-        if !SPAWNED {
+        if !*SPAWNED.get_mut() {
             Command::new("beanstalkd")
                 .spawn()
                 .expect("Unable to spawn server");
-            SPAWNED = true;
+            SPAWNED.compare_and_swap(false, true, Ordering::SeqCst);
         }
     }
 
@@ -555,7 +556,7 @@ mod tests {
                     .inspect(|(_, response)| assert_eq!(*response.as_ref().unwrap(), 2))
                     .and_then(|(bean, _)| bean.ignore("test"))
                     .inspect(|(_, response)| {
-                        assert_eq!(response.as_ref().unwrap(), &IgnoreResponse::Watching(1))
+                        assert_eq!(*response.as_ref().unwrap(), 1)
                     })
             }),
         );
