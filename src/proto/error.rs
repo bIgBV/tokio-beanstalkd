@@ -1,65 +1,73 @@
 //! Error types returned by Beanstalkd
+use failure::{Context, Fail, Backtrace};
+use std::fmt;
+use std::fmt::{Display};
 
-/// Errors that can be returned for any command
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Fail)]
-pub enum BeanstalkError {
-    /// The client sent a command line that was not well-formed. This can happen if the line does not
-    /// end with \r\n, if non-numeric characters occur where an integer is expected, if the wrong
-    /// number of arguments are present, or if the command line is mal-formed in any other way.
-    ///
-    /// This should not happen, if it does please file an issue.
-    #[fail(display = "Client command was not well formatted")]
+
+#[derive(Debug)]
+pub(crate) struct DecoderError {
+    inner: Context<ErrorKind>,
+}
+
+#[derive(Copy,Clone,Eq,PartialEq,Debug, Fail)]
+pub(crate) enum ErrorKind {
+    #[fail(display = "A protocol error occurred")]
+    Protocol(ProtocolError),
+    #[fail(display = "A parsing error occurred")]
+    Parsing(ParsingError),
+}
+
+#[derive(Copy,Clone,Eq,PartialEq,Debug)]
+pub(crate) enum ParsingError {
+    ParseId,
+    ParseString,
+    UnknownResponse
+}
+
+impl Fail for DecoderError {
+    fn cause(&self) -> Option<&Fail> {
+        self.inner.cause()
+    }
+
+    fn backtrace(&self) -> Option<&Backtrace> {
+        self.inner.backtrace()
+    }
+}
+
+impl Display for DecoderError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        Display::fmt(&self.inner, f)
+    }
+}
+
+impl DecoderError {
+    pub fn kind(&self) -> ErrorKind {
+        *self.inner.get_context()
+    }
+}
+
+impl From<ErrorKind> for DecoderError {
+    fn from(kind: ErrorKind) -> DecoderError {
+        DecoderError { inner: Context::new(kind)}
+    }
+}
+
+impl From<Context<ErrorKind>> for DecoderError {
+    fn from(inner: Context<ErrorKind>) -> DecoderError {
+        DecoderError { inner }
+    }
+}
+
+#[derive(Copy,Clone,Eq,PartialEq,Debug)]
+pub(crate) enum ProtocolError {
     BadFormat,
-
-    /// The server cannot allocate enough memory for the job. The client should try again later.
-    #[fail(display = "Server out of memory")]
     OutOfMemory,
-
-    /// This indicates a bug in the server. It should never happen. If it does happen, please report it
-    /// at http://groups.google.com/group/beanstalk-talk.
-    #[fail(display = "Internal server error")]
     InternalError,
-    /// The client sent a command that the server does not know.
-    ///
-    /// This should not happen, if it does please file an issue.
-    #[fail(display = "Unknown command sent by client")]
     UnknownCommand,
-}
-
-/// Errors which can be casued due to a PUT command
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Fail)]
-pub enum Put {
-    /// The server ran out of memory trying to grow the priority queue data structure.
-    /// The client should try another server or disconnect and try again later.
-    #[fail(display = "Server had to bury the request")]
     Buried,
-
-    /// The job body must be followed by a CR-LF pair, that is, "\r\n". These two bytes are not counted
-    /// in the job size given by the client in the put command line.
-    ///
-    /// This should never happen, if it does please file an issue.
-    #[fail(display = "CRLF missing from the end of command")]
-    ExpectedCLRF,
-
-    /// The client has requested to put a job with a body larger than max-job-size bytes
-    #[fail(display = "Job size exceeds max-job-size bytes")]
+    ExpectedCRLF,
     JobTooBig,
-
-    /// This means that the server has been put into "drain mode" and is no longer accepting new jobs.
-    /// The client should try another server or disconnect and try again later.
-    #[fail(display = "Server is in drain mode")]
     Draining,
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Fail)]
-pub enum Consumer {
-    /// If the job does not exist or is not either reserved by the client
-    #[fail(display = "Did not find a job of that Id")]
     NotFound,
-    /// if the server ran out of memory trying to grow the priority queue data structure.
-    #[fail(display = "Job got buried")]
-    Buried,
-    /// If the client attempts to ignore the only tube in its watch list.
-    #[fail(display = "Tried to ignore the only tube being watched")]
-    NotIgnored,
+    NotIgnored
 }

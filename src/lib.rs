@@ -100,6 +100,8 @@ pub use proto::error;
 pub use proto::response::*;
 pub use proto::{Id, Tube};
 // Request doesn't have to be a public type
+pub use errors;
+use proto::error::{ErrorKind, ParsingError, ProtocolError};
 use proto::Request;
 
 macro_rules! handle_response {
@@ -169,7 +171,7 @@ impl Beanstalkd {
         delay: u32,
         ttr: u32,
         data: D,
-    ) -> impl Future<Item = (Self, Result<Id, failure::Error>), Error = failure::Error>
+    ) -> impl Future<Item = (Self, Result<Id, errors::Put>), Error = failure::Error>
     where
         D: Into<Cow<'static, [u8]>>,
     {
@@ -180,11 +182,32 @@ impl Beanstalkd {
                 delay,
                 ttr,
                 data,
-            }).and_then(|conn| {
-                handle_response!(conn, {
-                    AnyResponse::Inserted(id) => Ok(id),
-                    AnyResponse::Buried => Err(failure::Error::from(error::Put::Buried)),
-                    r => Err(format_err!("got unexpected PUT response {:?}", r))
+            })
+            .and_then(|conn| {
+                conn.into_future().then(|val| match val {
+                    Ok((Some(val), conn)) => Ok((
+                        Beanstalkd { connection: conn },
+                        match val {
+                            AnyResponse::Inserted(id) => Ok(id),
+                            AnyResponse::Buried => Err(errors::Put::Buried),
+                            r => Err(format_err!("got unexpected PUT response {:?}", r)),
+                        },
+                    )),
+                    // None is only returned when the stream is closed
+                    Ok((None, _)) => bail!("Stream closed"),
+                    Err((e, conn)) => {
+                        match e.kind() {
+                            ErrorKind::Protocol(ProtocolError::)    
+                        }
+                    Ok((
+                        Beanstalkd { connection: conn },
+                        match e.kind() {
+                            ErrorKind::Protocol(ProtocolError::ExpectedCRLF) => {
+                                Err(errors::Put::ExpectedCRLF)
+                            }
+                        },
+                    )),
+                    }
                 })
             })
     }
@@ -269,7 +292,8 @@ impl Beanstalkd {
                 id,
                 priority,
                 delay,
-            }).and_then(|conn| {
+            })
+            .and_then(|conn| {
                 conn.into_future().then(|val| match val {
                     // Since both release and bury can get BURIED in the response from the server, but
                     // in the case of release, it is an error, handle it appropriately.
@@ -415,11 +439,13 @@ mod tests {
                     .and_then(|(bean, _)| {
                         // how about another one?
                         bean.put(0, 1, 100, &b"more data"[..])
-                    }).inspect(|(_, response)| assert!(response.is_ok()))
+                    })
+                    .inspect(|(_, response)| assert!(response.is_ok()))
                     .and_then(|(bean, _)| {
                         // Let's watch a particular tube
                         bean.using("test")
-                    }).inspect(|(_, response)| match response {
+                    })
+                    .inspect(|(_, response)| match response {
                         Ok(v) => assert_eq!(v, "test"),
                         Err(e) => panic!("Unexpected error: {}", e),
                     })
@@ -441,32 +467,44 @@ mod tests {
                 bean.put(0, 1, 100, &b"data"[..])
                     .inspect(|(_, response)| {
                         response.as_ref().unwrap();
-                    }).and_then(|(bean, _)| bean.reserve())
+                    })
+                    .and_then(|(bean, _)| bean.reserve())
                     .inspect(|(_, response)| assert_eq!(response.as_ref().unwrap().data, b"data"))
                     .and_then(|(bean, response)| bean.touch(response.unwrap().id))
                     .inspect(|(_, response)| {
                         response.as_ref().unwrap();
-                    }).and_then(|(bean, _)| {
+                    })
+                    .and_then(|(bean, _)| {
                         // how about another one?
                         bean.put(0, 1, 100, &b"more data"[..])
-                    }).and_then(|(bean, _)| bean.reserve())
+                    })
+                    .and_then(|(bean, _)| bean.reserve())
                     .and_then(|(bean, response)| bean.release(response.unwrap().id, 10, 10))
                     .inspect(|(_, response)| {
                         response.as_ref().unwrap();
-                    }).and_then(|(bean, _)| bean.reserve())
+                    })
+                    .and_then(|(bean, _)| bean.reserve())
                     .and_then(|(bean, response)| bean.bury(response.unwrap().id, 10))
                     .inspect(|(_, response)| {
                         response.as_ref().unwrap();
-                    }).and_then(|(bean, _)| {
+                    })
+                    .and_then(|(bean, _)| {
                         // how about another one?
                         bean.put(0, 1, 100, &b"more data"[..])
-                    }).inspect(|(_, response)| {
-                        response.as_ref().unwrap();
-                    }).and_then(|(bean, response)| bean.delete(response.unwrap()))
+                    })
                     .inspect(|(_, response)| {
+                        response.as_ref().unwrap();
+                    })
+                    .and_then(|(bean, response)| bean.delete(100))
+                    .inspect(|(_, response)| {
+                        match response {
+                            Err(error::Consumer::NotFound) => eprintln!("Got error"),
+                            Ok(_) => eprintln!("Got ok value"),
+                        };
                         // assert_eq!(*e, error::Consumer::NotFound);
                         response.as_ref().unwrap();
-                    }).and_then(|(bean, _)| bean.watch("test"))
+                    })
+                    .and_then(|(bean, _)| bean.watch("test"))
                     .inspect(|(_, response)| assert_eq!(*response.as_ref().unwrap(), 2))
                     .and_then(|(bean, _)| bean.ignore("test"))
                     .inspect(|(_, response)| {
