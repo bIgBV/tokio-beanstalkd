@@ -31,7 +31,7 @@ impl CommandCodec {
         CommandCodec { outstart: 0 }
     }
 
-    fn parse_response(&self, list: Vec<&str>) -> Result<AnyResponse, error::DecoderError> {
+    fn parse_response(&self, list: Vec<&str>) -> Result<AnyResponse, error::Decode> {
         eprintln!("Parsing: {:?}", list);
         if list.len() == 1 {
             return match list[0] {
@@ -96,11 +96,7 @@ impl CommandCodec {
         ))?
     }
 
-    fn parse_job(
-        &mut self,
-        src: &mut BytesMut,
-        pre: PreJob,
-    ) -> Result<Option<Job>, error::DecoderError> {
+    fn parse_job(&mut self, src: &mut BytesMut, pre: PreJob) -> Result<Option<Job>, error::Decode> {
         if let Some(carriage_offset) = src.iter().position(|b| *b == b'\r') {
             if src[carriage_offset + 1] == b'\n' {
                 let line =
@@ -118,7 +114,7 @@ impl CommandCodec {
     }
 }
 
-fn parse_pre_job(list: Vec<&str>) -> Result<PreJob, error::DecoderError> {
+fn parse_pre_job(list: Vec<&str>) -> Result<PreJob, error::Decode> {
     let id =
         u32::from_str(list[0]).context(error::ErrorKind::Parsing(error::ParsingError::ParseId))?;
     let bytes =
@@ -128,7 +124,7 @@ fn parse_pre_job(list: Vec<&str>) -> Result<PreJob, error::DecoderError> {
 
 impl Decoder for CommandCodec {
     type Item = AnyResponse;
-    type Error = error::DecoderError;
+    type Error = error::Decode;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         eprintln!("Decoding: {:?}", src);

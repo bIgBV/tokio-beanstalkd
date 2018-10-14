@@ -1,15 +1,15 @@
 //! Error types returned by Beanstalkd
-use failure::{Context, Fail, Backtrace};
+use failure::{Backtrace, Context, Fail};
 use std::fmt;
-use std::fmt::{Display};
-
+use std::fmt::Display;
+use std::io;
 
 #[derive(Debug)]
-pub(crate) struct DecoderError {
+pub(crate) struct Decode {
     inner: Context<ErrorKind>,
 }
 
-#[derive(Copy,Clone,Eq,PartialEq,Debug, Fail)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Fail)]
 pub(crate) enum ErrorKind {
     #[fail(display = "A protocol error occurred")]
     Protocol(ProtocolError),
@@ -17,14 +17,14 @@ pub(crate) enum ErrorKind {
     Parsing(ParsingError),
 }
 
-#[derive(Copy,Clone,Eq,PartialEq,Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub(crate) enum ParsingError {
     ParseId,
     ParseString,
-    UnknownResponse
+    UnknownResponse,
 }
 
-impl Fail for DecoderError {
+impl Fail for Decode {
     fn cause(&self) -> Option<&Fail> {
         self.inner.cause()
     }
@@ -34,31 +34,42 @@ impl Fail for DecoderError {
     }
 }
 
-impl Display for DecoderError {
+impl Display for Decode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         Display::fmt(&self.inner, f)
     }
 }
 
-impl DecoderError {
+impl Decode {
     pub fn kind(&self) -> ErrorKind {
         *self.inner.get_context()
     }
 }
 
-impl From<ErrorKind> for DecoderError {
-    fn from(kind: ErrorKind) -> DecoderError {
-        DecoderError { inner: Context::new(kind)}
+impl From<ErrorKind> for Decode {
+    fn from(kind: ErrorKind) -> Decode {
+        Decode {
+            inner: Context::new(kind),
+        }
     }
 }
 
-impl From<Context<ErrorKind>> for DecoderError {
-    fn from(inner: Context<ErrorKind>) -> DecoderError {
-        DecoderError { inner }
+// Why do I have to implement this?
+impl From<io::Error> for Decode {
+    fn from(kind: io::Error) -> Decode {
+        Decode {
+            inner: Context::new(ErrorKind::Parsing(ParsingError::ParseString)),
+        }
     }
 }
 
-#[derive(Copy,Clone,Eq,PartialEq,Debug)]
+impl From<Context<ErrorKind>> for Decode {
+    fn from(inner: Context<ErrorKind>) -> Decode {
+        Decode { inner }
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub(crate) enum ProtocolError {
     BadFormat,
     OutOfMemory,
@@ -69,5 +80,5 @@ pub(crate) enum ProtocolError {
     JobTooBig,
     Draining,
     NotFound,
-    NotIgnored
+    NotIgnored,
 }

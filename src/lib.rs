@@ -106,6 +106,13 @@ use proto::Request;
 
 use errors::{BeanstalkError, Consumer, Put};
 
+/// A macro to map internal types to external types. The response from a Stream is a 
+/// `(Result<Option<Decoder::Item>, Decoder::Error, connection)`. This value needs to be 
+/// maapped to the types that we expect. As we can see there are three possible outcomes,
+/// and each outcome where there is either a response or an error from the server, we get
+/// either an AnyResponse or a proto_error::ProtocolError which need to mapped to simpler
+/// public facing types. That is what the two mappings are. The first one is when you get
+/// Some(response) and the second one is purely for when the Decoder returns an Error
 macro_rules! handle_response {
     ($input:ident, $mapping:tt, $error_mapping:tt) => {
         $input.into_future().then(|val| match val {
@@ -189,7 +196,7 @@ impl Beanstalkd {
                 handle_response!(conn, {
                     AnyResponse::Inserted(id) => Ok(id),
                     AnyResponse::Buried => Err(Put::Buried),
-                    r => Err(Put::Beanstalk{error: BeanstalkError::UnexpectedResponse})
+                    _r => Err(Put::Beanstalk{error: BeanstalkError::UnexpectedResponse})
                 }, {
                     ErrorKind::Protocol(ProtocolError::BadFormat) => Err(Put::Beanstalk{error: BeanstalkError::BadFormat}),
                     ErrorKind::Protocol(ProtocolError::OutOfMemory) => Err(Put::Beanstalk{error: BeanstalkError::OutOfMemory}),
@@ -199,7 +206,7 @@ impl Beanstalkd {
                     ErrorKind::Protocol(ProtocolError::ExpectedCRLF) => Err(Put::ExpectedCRLF),
                     ErrorKind::Protocol(ProtocolError::JobTooBig) => Err(Put::JobTooBig),
                     ErrorKind::Protocol(ProtocolError::Draining) => Err(Put::Draining),
-                    r => Err(Put::Beanstalk{error: BeanstalkError::UnexpectedResponse})
+                    _r => Err(Put::Beanstalk{error: BeanstalkError::UnexpectedResponse})
                 })
             })
     }
@@ -218,13 +225,13 @@ impl Beanstalkd {
             .and_then(|conn| {
                 handle_response!(conn, {
                     AnyResponse::Reserved(job) => Ok(job),
-                    r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
+                    _r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
                 }, {
                     ErrorKind::Protocol(ProtocolError::BadFormat) => Err(Consumer::Beanstalk{error: BeanstalkError::BadFormat}),
                     ErrorKind::Protocol(ProtocolError::OutOfMemory) => Err(Consumer::Beanstalk{error: BeanstalkError::OutOfMemory}),
                     ErrorKind::Protocol(ProtocolError::InternalError) => Err(Consumer::Beanstalk{error: BeanstalkError::InternalError}),
                     ErrorKind::Protocol(ProtocolError::UnknownCommand) => Err(Consumer::Beanstalk{error: BeanstalkError::UnknownCommand}),
-                    r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
+                    _r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
                  })
             })
     }
@@ -238,20 +245,19 @@ impl Beanstalkd {
     pub fn using(
         self,
         tube: &'static str,
-    ) -> impl Future<Item = (Self, Result<Tube, BeanstalkError>), Error = failure::Error>
-    {
+    ) -> impl Future<Item = (Self, Result<Tube, BeanstalkError>), Error = failure::Error> {
         self.connection
             .send(Request::Use { tube })
             .and_then(|conn| {
                 handle_response!(conn, {
                     AnyResponse::Using(tube) => Ok(tube),
-                    r => Err(BeanstalkError::UnexpectedResponse)
+                    _r => Err(BeanstalkError::UnexpectedResponse)
                 }, {
                     ErrorKind::Protocol(ProtocolError::BadFormat) => Err(BeanstalkError::BadFormat),
                     ErrorKind::Protocol(ProtocolError::OutOfMemory) => Err(BeanstalkError::OutOfMemory),
                     ErrorKind::Protocol(ProtocolError::InternalError) => Err(BeanstalkError::InternalError),
                     ErrorKind::Protocol(ProtocolError::UnknownCommand) => Err(BeanstalkError::UnknownCommand),
-                    r => Err(BeanstalkError::UnexpectedResponse)
+                    _r => Err(BeanstalkError::UnexpectedResponse)
                  })
             })
     }
@@ -271,7 +277,7 @@ impl Beanstalkd {
             .and_then(|conn| {
                 handle_response!(conn, {
                     AnyResponse::Deleted => Ok(()),
-                    r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
+                    _r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
                 }, {
                     ErrorKind::Protocol(ProtocolError::BadFormat) => Err(Consumer::Beanstalk{error: BeanstalkError::BadFormat}),
                     ErrorKind::Protocol(ProtocolError::OutOfMemory) => Err(Consumer::Beanstalk{error: BeanstalkError::OutOfMemory}),
@@ -279,7 +285,7 @@ impl Beanstalkd {
                     ErrorKind::Protocol(ProtocolError::UnknownCommand) => Err(Consumer::Beanstalk{error: BeanstalkError::UnknownCommand}),
 
                     ErrorKind::Protocol(ProtocolError::NotFound) => Err(Consumer::NotFound),
-                    r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
+                    _r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
                 })
             })
     }
@@ -310,7 +316,7 @@ impl Beanstalkd {
                 handle_response!(conn, {
                     AnyResponse::Released => Ok(()),
                     AnyResponse::Buried => Err(Consumer::Buried),
-                    r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
+                    _r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
                 }, {
                     ErrorKind::Protocol(ProtocolError::BadFormat) => Err(Consumer::Beanstalk{error: BeanstalkError::BadFormat}),
                     ErrorKind::Protocol(ProtocolError::OutOfMemory) => Err(Consumer::Beanstalk{error: BeanstalkError::OutOfMemory}),
@@ -318,7 +324,7 @@ impl Beanstalkd {
                     ErrorKind::Protocol(ProtocolError::UnknownCommand) => Err(Consumer::Beanstalk{error: BeanstalkError::UnknownCommand}),
 
                     ErrorKind::Protocol(ProtocolError::NotFound) => Err(Consumer::NotFound),
-                    r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
+                    _r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
                 })
             })
     }
@@ -334,14 +340,13 @@ impl Beanstalkd {
     pub fn touch(
         self,
         id: u32,
-    ) -> impl Future<Item = (Self, Result<(), Consumer>), Error = failure::Error>
-    {
+    ) -> impl Future<Item = (Self, Result<(), Consumer>), Error = failure::Error> {
         self.connection
             .send(Request::Touch { id })
             .and_then(|conn| {
                 handle_response!(conn, {
                     AnyResponse::Touched => Ok(()),
-                    r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
+                    _r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
                 }, {
 
                     ErrorKind::Protocol(ProtocolError::BadFormat) => Err(Consumer::Beanstalk{error: BeanstalkError::BadFormat}),
@@ -349,7 +354,7 @@ impl Beanstalkd {
                     ErrorKind::Protocol(ProtocolError::InternalError) => Err(Consumer::Beanstalk{error: BeanstalkError::InternalError}),
                     ErrorKind::Protocol(ProtocolError::UnknownCommand) => Err(Consumer::Beanstalk{error: BeanstalkError::UnknownCommand}),
                     ErrorKind::Protocol(ProtocolError::NotFound) => Err(Consumer::NotFound),
-                    r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
+                    _r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
                 })
             })
     }
@@ -371,14 +376,14 @@ impl Beanstalkd {
             .and_then(|conn| {
                 handle_response!(conn, {
                     AnyResponse::Buried => Ok(()),
-                    r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
+                    _r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
                 }, {
                     ErrorKind::Protocol(ProtocolError::BadFormat) => Err(Consumer::Beanstalk{error: BeanstalkError::BadFormat}),
                     ErrorKind::Protocol(ProtocolError::OutOfMemory) => Err(Consumer::Beanstalk{error: BeanstalkError::OutOfMemory}),
                     ErrorKind::Protocol(ProtocolError::InternalError) => Err(Consumer::Beanstalk{error: BeanstalkError::InternalError}),
                     ErrorKind::Protocol(ProtocolError::UnknownCommand) => Err(Consumer::Beanstalk{error: BeanstalkError::UnknownCommand}),
                     ErrorKind::Protocol(ProtocolError::NotFound) => Err(Consumer::NotFound),
-                    r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
+                    _r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
                 })
             })
     }
@@ -401,14 +406,14 @@ impl Beanstalkd {
             .and_then(|conn| {
                 handle_response!(conn, {
                     AnyResponse::Watching(n) => Ok(n),
-                    r => Err(BeanstalkError::UnexpectedResponse)
+                    _r => Err(BeanstalkError::UnexpectedResponse)
                 }, {
 
                     ErrorKind::Protocol(ProtocolError::BadFormat) => Err(BeanstalkError::BadFormat),
                     ErrorKind::Protocol(ProtocolError::OutOfMemory) => Err(BeanstalkError::OutOfMemory),
                     ErrorKind::Protocol(ProtocolError::InternalError) => Err(BeanstalkError::InternalError),
                     ErrorKind::Protocol(ProtocolError::UnknownCommand) => Err(BeanstalkError::UnknownCommand),
-                    r => Err(BeanstalkError::UnexpectedResponse)
+                    _r => Err(BeanstalkError::UnexpectedResponse)
                 })
             })
     }
@@ -433,14 +438,14 @@ impl Beanstalkd {
                 handle_response!(conn, {
                     AnyResponse::Watching(n) => Ok(n),
                     AnyResponse::NotIgnored => Err(errors::Consumer::NotIgnored),
-                    r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
+                    _r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
                 }, {
                     ErrorKind::Protocol(ProtocolError::BadFormat) => Err(Consumer::Beanstalk{error: BeanstalkError::BadFormat}),
                     ErrorKind::Protocol(ProtocolError::OutOfMemory) => Err(Consumer::Beanstalk{error: BeanstalkError::OutOfMemory}),
                     ErrorKind::Protocol(ProtocolError::InternalError) => Err(Consumer::Beanstalk{error: BeanstalkError::InternalError}),
                     ErrorKind::Protocol(ProtocolError::UnknownCommand) => Err(Consumer::Beanstalk{error: BeanstalkError::UnknownCommand}),
                     ErrorKind::Protocol(ProtocolError::NotFound) => Err(Consumer::NotFound),
-                    r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
+                    _r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
                 })
             })
     }
