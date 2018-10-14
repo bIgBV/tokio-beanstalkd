@@ -467,7 +467,6 @@ mod tests {
     static mut SPAWNED: AtomicBool = AtomicBool::new(false);
 
     // Simple function to make sure only one instance of beanstalkd is spawned.
-    // Really sketchy..
     unsafe fn spawn_beanstalkd() {
         if !*SPAWNED.get_mut() {
             Command::new("beanstalkd")
@@ -540,24 +539,14 @@ mod tests {
                     .inspect(|(_, response)| {
                         response.as_ref().unwrap();
                     })
-                    .and_then(|(bean, _)| {
-                        // how about another one?
-                        bean.put(0, 1, 100, &b"more data"[..])
-                    })
+                    .and_then(|(bean, response)| bean.delete(100))
                     .inspect(|(_, response)| {
-                        response.as_ref().unwrap();
-                    })
-                    .and_then(|(bean, response)| bean.delete(response.unwrap()))
-                    .inspect(|(_, response)| {
-                        // assert_eq!(*e, error::Consumer::NotFound);
-                        response.as_ref().unwrap();
+                        assert_eq!(*response, Err(errors::Consumer::NotFound));
                     })
                     .and_then(|(bean, _)| bean.watch("test"))
                     .inspect(|(_, response)| assert_eq!(*response.as_ref().unwrap(), 2))
                     .and_then(|(bean, _)| bean.ignore("test"))
-                    .inspect(|(_, response)| {
-                        assert_eq!(*response.as_ref().unwrap(), 1)
-                    })
+                    .inspect(|(_, response)| assert_eq!(*response.as_ref().unwrap(), 1))
             }),
         );
         assert!(!bean.is_err());
