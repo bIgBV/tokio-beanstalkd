@@ -28,7 +28,7 @@ pub enum BeanstalkError {
 
     #[doc(hidden)]
     #[fail(display = "Just an extention..")]
-    __Nonexhaustive
+    __Nonexhaustive,
 }
 
 /// Errors which can be casued due to a PUT command
@@ -60,9 +60,10 @@ pub enum Put {
 
     #[doc(hidden)]
     #[fail(display = "Just an extention..")]
-    __Nonexhaustive
+    __Nonexhaustive,
 }
 
+/// Errors which can occur when acting as a consumer/worker
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Fail)]
 pub enum Consumer {
     /// If the job does not exist or is not either reserved by the client
@@ -80,5 +81,5 @@ pub enum Consumer {
 
     #[doc(hidden)]
     #[fail(display = "Just an extention..")]
-    __Nonexhaustive
+    __Nonexhaustive,
 }

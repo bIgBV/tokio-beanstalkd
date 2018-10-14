@@ -4,11 +4,14 @@ use std::fmt;
 use std::fmt::Display;
 use std::io;
 
+/// Custom error type which represents all the various errors which can occur
+/// when decoding a response from the server
 #[derive(Debug)]
 pub(crate) struct Decode {
     inner: Context<ErrorKind>,
 }
 
+/// Enum that helps understand what kind of a decoder error occurred.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Fail)]
 pub(crate) enum ErrorKind {
     #[fail(display = "A protocol error occurred")]
@@ -19,11 +22,20 @@ pub(crate) enum ErrorKind {
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub(crate) enum ParsingError {
+    /// Represents errors when parsing an Integer value such as a Job ID or the
+    /// number of tubes being watched
     ParseId,
+
+    /// Represents any errors which occur when converting the parsed ASCII string
+    /// to UTF8. This should not occur as the Beanstalkd protocol only works with
+    /// ASCII names
     ParseString,
+
+    /// If some unknown error occurred.
     UnknownResponse,
 }
 
+/// This helps us keep track of the underlying cause of the error
 impl Fail for Decode {
     fn cause(&self) -> Option<&Fail> {
         self.inner.cause()

@@ -7,13 +7,14 @@ use std::io;
 use std::str;
 use std::str::FromStr;
 
-pub mod error;
+pub(crate) mod error;
 mod request;
 pub(crate) mod response;
 
 pub(crate) use self::request::Request;
 pub use self::response::*;
 
+use self::error::{Decode, ErrorKind, ParsingError, ProtocolError};
 use self::response::{Job, PreJob};
 
 pub type Tube = String;
@@ -31,34 +32,24 @@ impl CommandCodec {
         CommandCodec { outstart: 0 }
     }
 
-    fn parse_response(&self, list: Vec<&str>) -> Result<AnyResponse, error::Decode> {
+    fn parse_response(&self, list: Vec<&str>) -> Result<AnyResponse, Decode> {
         eprintln!("Parsing: {:?}", list);
         if list.len() == 1 {
             return match list[0] {
-                "OUT_OF_MEMORY" => Err(error::ErrorKind::Protocol(
-                    error::ProtocolError::OutOfMemory,
-                ))?,
-                "INTERNAL_ERROR" => Err(error::ErrorKind::Protocol(
-                    error::ProtocolError::InternalError,
-                ))?,
-                "BAD_FORMAT" => Err(error::ErrorKind::Protocol(error::ProtocolError::BadFormat))?,
-                "UNKNOWN_COMMAND" => Err(error::ErrorKind::Protocol(
-                    error::ProtocolError::UnknownCommand,
-                ))?,
-                "EXPECTED_CRLF" => Err(error::ErrorKind::Protocol(
-                    error::ProtocolError::ExpectedCRLF,
-                ))?,
-                "JOB_TOO_BIG" => Err(error::ErrorKind::Protocol(error::ProtocolError::JobTooBig))?,
-                "DRAINING" => Err(error::ErrorKind::Protocol(error::ProtocolError::Draining))?,
-                "NOT_FOUND" => Err(error::ErrorKind::Protocol(error::ProtocolError::NotFound))?,
-                "NOT_IGNORED" => Err(error::ErrorKind::Protocol(error::ProtocolError::NotIgnored))?,
+                "OUT_OF_MEMORY" => Err(ErrorKind::Protocol(ProtocolError::OutOfMemory))?,
+                "INTERNAL_ERROR" => Err(ErrorKind::Protocol(ProtocolError::InternalError))?,
+                "BAD_FORMAT" => Err(ErrorKind::Protocol(ProtocolError::BadFormat))?,
+                "UNKNOWN_COMMAND" => Err(ErrorKind::Protocol(ProtocolError::UnknownCommand))?,
+                "EXPECTED_CRLF" => Err(ErrorKind::Protocol(ProtocolError::ExpectedCRLF))?,
+                "JOB_TOO_BIG" => Err(ErrorKind::Protocol(ProtocolError::JobTooBig))?,
+                "DRAINING" => Err(ErrorKind::Protocol(ProtocolError::Draining))?,
+                "NOT_FOUND" => Err(ErrorKind::Protocol(ProtocolError::NotFound))?,
+                "NOT_IGNORED" => Err(ErrorKind::Protocol(ProtocolError::NotIgnored))?,
                 "BURIED" => Ok(AnyResponse::Buried),
                 "TOUCHED" => Ok(AnyResponse::Touched),
                 "RELEASED" => Ok(AnyResponse::Released),
                 "DELETED" => Ok(AnyResponse::Deleted),
-                _ => Err(error::ErrorKind::Parsing(
-                    error::ParsingError::UnknownResponse,
-                ))?,
+                _ => Err(ErrorKind::Parsing(ParsingError::UnknownResponse))?,
             };
         }
 
@@ -66,41 +57,34 @@ impl CommandCodec {
             eprintln!("Parsing: {:?}", list[1]);
             return match list[0] {
                 "INSERTED" => {
-                    let id: u32 = u32::from_str(list[1])
-                        .context(error::ErrorKind::Parsing(error::ParsingError::ParseId))?;
+                    let id: u32 =
+                        u32::from_str(list[1]).context(ErrorKind::Parsing(ParsingError::ParseId))?;
                     Ok(AnyResponse::Inserted(id))
                 }
                 "WATCHING" => {
-                    let count = u32::from_str(list[1])
-                        .context(error::ErrorKind::Parsing(error::ParsingError::ParseId))?;
+                    let count =
+                        u32::from_str(list[1]).context(ErrorKind::Parsing(ParsingError::ParseId))?;
                     Ok(AnyResponse::Watching(count))
                 }
                 "USING" => Ok(AnyResponse::Using(String::from(list[1]))),
-                _ => Err(error::ErrorKind::Parsing(
-                    error::ParsingError::UnknownResponse,
-                ))?,
+                _ => Err(ErrorKind::Parsing(ParsingError::UnknownResponse))?,
             };
         }
 
         if list.len() == 3 {
             return match list[0] {
                 "RESERVED" => Ok(AnyResponse::Pre(parse_pre_job(list[1..].to_vec())?)),
-                _ => Err(error::ErrorKind::Parsing(
-                    error::ParsingError::UnknownResponse,
-                ))?,
+                _ => Err(ErrorKind::Parsing(ParsingError::UnknownResponse))?,
             };
         }
 
-        Err(error::ErrorKind::Parsing(
-            error::ParsingError::UnknownResponse,
-        ))?
+        Err(ErrorKind::Parsing(ParsingError::UnknownResponse))?
     }
 
-    fn parse_job(&mut self, src: &mut BytesMut, pre: PreJob) -> Result<Option<Job>, error::Decode> {
+    fn parse_job(&mut self, src: &mut BytesMut, pre: PreJob) -> Result<Option<Job>, Decode> {
         if let Some(carriage_offset) = src.iter().position(|b| *b == b'\r') {
             if src[carriage_offset + 1] == b'\n' {
-                let line =
-                    utf8(src).context(error::ErrorKind::Parsing(error::ParsingError::ParseString))?;
+                let line = utf8(src).context(ErrorKind::Parsing(ParsingError::ParseString))?;
                 let line: Vec<&str> = line.trim().split(" ").collect();
                 return Ok(Some(Job {
                     id: pre.id,
@@ -114,17 +98,15 @@ impl CommandCodec {
     }
 }
 
-fn parse_pre_job(list: Vec<&str>) -> Result<PreJob, error::Decode> {
-    let id =
-        u32::from_str(list[0]).context(error::ErrorKind::Parsing(error::ParsingError::ParseId))?;
-    let bytes =
-        usize::from_str(list[1]).context(error::ErrorKind::Parsing(error::ParsingError::ParseId))?;
+fn parse_pre_job(list: Vec<&str>) -> Result<PreJob, Decode> {
+    let id = u32::from_str(list[0]).context(ErrorKind::Parsing(ParsingError::ParseId))?;
+    let bytes = usize::from_str(list[1]).context(ErrorKind::Parsing(ParsingError::ParseId))?;
     Ok(PreJob { id, bytes })
 }
 
 impl Decoder for CommandCodec {
     type Item = AnyResponse;
-    type Error = error::Decode;
+    type Error = Decode;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         eprintln!("Decoding: {:?}", src);
@@ -134,8 +116,7 @@ impl Decoder for CommandCodec {
                 // contains elements [0, at), so + 1 for \r and then +1 for \n
                 let offset = self.outstart + carriage_offset + 1 + 1;
                 let line = src.split_to(offset);
-                let line = utf8(&line)
-                    .context(error::ErrorKind::Parsing(error::ParsingError::ParseString))?;
+                let line = utf8(&line).context(ErrorKind::Parsing(ParsingError::ParseString))?;
                 let line = line.trim().split(" ").collect();
 
                 let response = self.parse_response(line)?;

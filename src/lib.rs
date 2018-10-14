@@ -12,13 +12,20 @@
 //!
 //! ## Operation
 //! This library can serve as a client for both the application and the worker. The application would
-//! `put` jobs on the queue and the workers can `reserve` them. Once they are done with the job, they
-//! have to `delete` job. This is required for every job, or else beanstlkd will not remove it from
+//! [`put`][put] jobs on the queue and the workers can [`reserve`][reserve] them. Once they are done with the job, they
+//! have to [`delete`][delete] job. This is required for every job, or else Beanstalkd will not remove it from
 //! its internal datastructres.
 //!
-//! If a worker cannot finish the job in it's TTR (Time To Run), then it can `release` the job. The
-//! application can use the `using` method to put jobs in a specific tube, and workers can use `watch`
+//! [put]: struct.Beanstalkd.html#method.put
+//! [reserve]: struct.Beanstalkd.html#method.reserve
+//! [delete]: struct.Beanstalkd.html#method.delete
+//!
+//! If a worker cannot finish the job in it's TTR (Time To Run), then it can [`release`](release) the job. The
+//! application can use the [`using`](using) method to put jobs in a specific tube, and workers can use `watch`
 //! to only reserve jobs from the specified tubes.
+//!
+//! [release]: struct.Beanstalkd.html#method.release
+//! [using]: struct.Beanstalkd.html#method.using
 //!
 //! ## Interaction with Tokio
 //!
@@ -106,8 +113,8 @@ use proto::Request;
 
 use errors::{BeanstalkError, Consumer, Put};
 
-/// A macro to map internal types to external types. The response from a Stream is a 
-/// `(Result<Option<Decoder::Item>, Decoder::Error, connection)`. This value needs to be 
+/// A macro to map internal types to external types. The response from a Stream is a
+/// `(Result<Option<Decoder::Item>, Decoder::Error, connection)`. This value needs to be
 /// maapped to the types that we expect. As we can see there are three possible outcomes,
 /// and each outcome where there is either a response or an error from the server, we get
 /// either an AnyResponse or a proto_error::ProtocolError which need to mapped to simpler
@@ -198,6 +205,7 @@ impl Beanstalkd {
                     AnyResponse::Buried => Err(Put::Buried),
                     _r => Err(Put::Beanstalk{error: BeanstalkError::UnexpectedResponse})
                 }, {
+                    // TODO: extract duplication. There has got to be some way to do that...
                     ErrorKind::Protocol(ProtocolError::BadFormat) => Err(Put::Beanstalk{error: BeanstalkError::BadFormat}),
                     ErrorKind::Protocol(ProtocolError::OutOfMemory) => Err(Put::Beanstalk{error: BeanstalkError::OutOfMemory}),
                     ErrorKind::Protocol(ProtocolError::InternalError) => Err(Put::Beanstalk{error: BeanstalkError::InternalError}),
@@ -426,8 +434,7 @@ impl Beanstalkd {
     ///
     /// A successful response is:
     ///
-    /// - [IgnoreResponse::Watching(u32)](enum.IgnoreResponse.html#variant.Watching)
-    ///   The value returned is the count of the tubes being watched by the current connection.
+    /// - The count of the number of tubes currently watching
     pub fn ignore(
         self,
         tube: &'static str,

@@ -11,11 +11,17 @@ pub struct PreJob {
 /// A job according to Beanstalkd
 #[derive(Debug, PartialEq, Eq)]
 pub struct Job {
+    /// The ID job assigned by Beanstalkd
     pub id: super::Id,
+
+    /// The size of the payload
     pub bytes: usize,
+
+    /// The payload
     pub data: Vec<u8>,
 }
 
+/// All possible responses that the Beanstalkd server can send.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum AnyResponse {
     Reserved(Job),
