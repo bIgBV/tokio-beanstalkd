@@ -22,6 +22,9 @@ pub enum BeanstalkError {
     /// This should not happen, if it does please file an issue.
     #[fail(display = "Unknown command sent by client")]
     UnknownCommand,
+
+    #[fail(display = "An unexpected response occurred")]
+    UnexpectedResponse
 }
 
 /// Errors which can be casued due to a PUT command
@@ -48,8 +51,10 @@ pub enum Put {
     #[fail(display = "Server is in drain mode")]
     Draining,
 
-    #[fail(display = "")]
-    Beanstalk(BeanstalkError)
+    #[fail(display = "A protocol error occurred: {}", error)]
+    Beanstalk {
+        error: BeanstalkError
+    }
 
 }
 
@@ -64,4 +69,9 @@ pub enum Consumer {
     /// If the client attempts to ignore the only tube in its watch list.
     #[fail(display = "Tried to ignore the only tube being watched")]
     NotIgnored,
+    
+    #[fail(display = "A protocol error occurred: {}", error)]
+    Beanstalk {
+        error: BeanstalkError
+    }
 }
