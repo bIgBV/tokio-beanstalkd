@@ -18,11 +18,11 @@ use self::error::{Decode, ErrorKind, ParsingError, ProtocolError};
 use self::response::{Job, PreJob};
 
 /// A Tube is a way of separating different types of jobs in Beanstalkd.
-/// 
-///  The clinet can use a particular tube by calling [`using`][using] and Beanstalkd will create a 
-/// new tube if one does not already exist with that name. Workers can [`watch`][watch] particular 
+///
+///  The clinet can use a particular tube by calling [`using`][using] and Beanstalkd will create a
+/// new tube if one does not already exist with that name. Workers can [`watch`][watch] particular
 /// tubes and receive jobs only from those tubes.
-/// 
+///
 /// [using]: struct.Beanstalkd.html#method.using
 /// [watch]: struct.Beanstalkd.html#method.watch
 pub type Tube = String;
@@ -66,13 +66,13 @@ impl CommandCodec {
             eprintln!("Parsing: {:?}", list[1]);
             return match list[0] {
                 "INSERTED" => {
-                    let id: u32 =
-                        u32::from_str(list[1]).context(ErrorKind::Parsing(ParsingError::ParseId))?;
+                    let id: u32 = u32::from_str(list[1])
+                        .context(ErrorKind::Parsing(ParsingError::ParseId))?;
                     Ok(AnyResponse::Inserted(id))
                 }
                 "WATCHING" => {
-                    let count =
-                        u32::from_str(list[1]).context(ErrorKind::Parsing(ParsingError::ParseId))?;
+                    let count = u32::from_str(list[1])
+                        .context(ErrorKind::Parsing(ParsingError::ParseId))?;
                     Ok(AnyResponse::Watching(count))
                 }
                 "USING" => Ok(AnyResponse::Using(String::from(list[1]))),
