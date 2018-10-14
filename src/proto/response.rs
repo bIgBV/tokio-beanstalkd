@@ -11,20 +11,17 @@ pub struct PreJob {
 /// A job according to Beanstalkd
 #[derive(Debug, PartialEq, Eq)]
 pub struct Job {
+    /// The ID job assigned by Beanstalkd
     pub id: super::Id,
+
+    /// The size of the payload
     pub bytes: usize,
+
+    /// The payload
     pub data: Vec<u8>,
 }
 
-/// A response to an IGNORE command.
-#[derive(Debug, PartialEq, Eq)]
-pub enum IgnoreResponse {
-    /// The integer number of tubes currently left in the watch list.
-    Watching(u32),
-    /// The client attempted to ignore the only tube in its watch list.
-    NotIgnored,
-}
-
+/// All possible responses that the Beanstalkd server can send.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum AnyResponse {
     Reserved(Job),

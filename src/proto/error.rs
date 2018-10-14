@@ -1,65 +1,96 @@
 //! Error types returned by Beanstalkd
+use failure::{Backtrace, Context, Fail};
+use std::fmt;
+use std::fmt::Display;
+use std::io;
 
-/// Errors that can be returned for any command
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Fail)]
-pub enum BeanstalkError {
-    /// The client sent a command line that was not well-formed. This can happen if the line does not
-    /// end with \r\n, if non-numeric characters occur where an integer is expected, if the wrong
-    /// number of arguments are present, or if the command line is mal-formed in any other way.
-    ///
-    /// This should not happen, if it does please file an issue.
-    #[fail(display = "Client command was not well formatted")]
+/// Custom error type which represents all the various errors which can occur
+/// when decoding a response from the server
+#[derive(Debug)]
+pub(crate) struct Decode {
+    inner: Context<ErrorKind>,
+}
+
+/// Enum that helps understand what kind of a decoder error occurred.
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Fail)]
+pub(crate) enum ErrorKind {
+    #[fail(display = "A protocol error occurred")]
+    Protocol(ProtocolError),
+    #[fail(display = "A parsing error occurred")]
+    Parsing(ParsingError),
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub(crate) enum ParsingError {
+    /// Represents errors when parsing an Integer value such as a Job ID or the
+    /// number of tubes being watched
+    ParseId,
+
+    /// Represents any errors which occur when converting the parsed ASCII string
+    /// to UTF8. This should not occur as the Beanstalkd protocol only works with
+    /// ASCII names
+    ParseString,
+
+    /// If some unknown error occurred.
+    UnknownResponse,
+}
+
+/// This helps us keep track of the underlying cause of the error
+impl Fail for Decode {
+    fn cause(&self) -> Option<&Fail> {
+        self.inner.cause()
+    }
+
+    fn backtrace(&self) -> Option<&Backtrace> {
+        self.inner.backtrace()
+    }
+}
+
+impl Display for Decode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        Display::fmt(&self.inner, f)
+    }
+}
+
+impl Decode {
+    pub fn kind(&self) -> ErrorKind {
+        *self.inner.get_context()
+    }
+}
+
+impl From<ErrorKind> for Decode {
+    fn from(kind: ErrorKind) -> Decode {
+        Decode {
+            inner: Context::new(kind),
+        }
+    }
+}
+
+// Why do I have to implement this?
+impl From<io::Error> for Decode {
+    fn from(kind: io::Error) -> Decode {
+        Decode {
+            inner: Context::new(ErrorKind::Parsing(ParsingError::ParseString)),
+        }
+    }
+}
+
+impl From<Context<ErrorKind>> for Decode {
+    fn from(inner: Context<ErrorKind>) -> Decode {
+        Decode { inner }
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub(crate) enum ProtocolError {
     BadFormat,
-
-    /// The server cannot allocate enough memory for the job. The client should try again later.
-    #[fail(display = "Server out of memory")]
     OutOfMemory,
-
-    /// This indicates a bug in the server. It should never happen. If it does happen, please report it
-    /// at http://groups.google.com/group/beanstalk-talk.
-    #[fail(display = "Internal server error")]
     InternalError,
-    /// The client sent a command that the server does not know.
-    ///
-    /// This should not happen, if it does please file an issue.
-    #[fail(display = "Unknown command sent by client")]
     UnknownCommand,
-}
-
-/// Errors which can be casued due to a PUT command
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Fail)]
-pub enum Put {
-    /// The server ran out of memory trying to grow the priority queue data structure.
-    /// The client should try another server or disconnect and try again later.
-    #[fail(display = "Server had to bury the request")]
     Buried,
-
-    /// The job body must be followed by a CR-LF pair, that is, "\r\n". These two bytes are not counted
-    /// in the job size given by the client in the put command line.
-    ///
-    /// This should never happen, if it does please file an issue.
-    #[fail(display = "CRLF missing from the end of command")]
-    ExpectedCLRF,
-
-    /// The client has requested to put a job with a body larger than max-job-size bytes
-    #[fail(display = "Job size exceeds max-job-size bytes")]
+    ExpectedCRLF,
     JobTooBig,
-
-    /// This means that the server has been put into "drain mode" and is no longer accepting new jobs.
-    /// The client should try another server or disconnect and try again later.
-    #[fail(display = "Server is in drain mode")]
     Draining,
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Fail)]
-pub enum Consumer {
-    /// If the job does not exist or is not either reserved by the client
-    #[fail(display = "Did not find a job of that Id")]
     NotFound,
-    /// if the server ran out of memory trying to grow the priority queue data structure.
-    #[fail(display = "Job got buried")]
-    Buried,
-    /// If the client attempts to ignore the only tube in its watch list.
-    #[fail(display = "Tried to ignore the only tube being watched")]
     NotIgnored,
 }
