@@ -25,6 +25,10 @@ pub enum BeanstalkError {
 
     #[fail(display = "An unexpected response occurred")]
     UnexpectedResponse,
+
+    #[doc(hidden)]
+    #[fail(display = "Just an extention..")]
+    __Nonexhaustive
 }
 
 /// Errors which can be casued due to a PUT command
@@ -53,6 +57,10 @@ pub enum Put {
 
     #[fail(display = "A protocol error occurred: {}", error)]
     Beanstalk { error: BeanstalkError },
+
+    #[doc(hidden)]
+    #[fail(display = "Just an extention..")]
+    __Nonexhaustive
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Fail)]
@@ -69,4 +77,8 @@ pub enum Consumer {
 
     #[fail(display = "A protocol error occurred: {}", error)]
     Beanstalk { error: BeanstalkError },
+
+    #[doc(hidden)]
+    #[fail(display = "Just an extention..")]
+    __Nonexhaustive
 }

@@ -88,7 +88,7 @@ extern crate futures;
 extern crate failure;
 extern crate tokio;
 
-mod errors;
+pub mod errors;
 mod proto;
 
 use tokio::codec::Framed;
