@@ -1,3 +1,5 @@
+//! The errors returned by the different operations in the library
+
 /// Errors that can be returned for any command
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Fail)]
 pub enum BeanstalkError {

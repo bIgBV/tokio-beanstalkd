@@ -33,59 +33,53 @@
 //! you cannot resolve them solely using `.wait()`, but should instead use `tokio::run` or
 //! explicitly create a `tokio::Runtime` and then use `Runtime::block_on`.
 //!
-//! A contrived example
+//! An simple example client could look something like this:
 //!
 //! ```no_run
-//! extern crate tokio;
-//! extern crate futures;
-//! extern crate tokio_beanstalkd;
-//!
-//! use tokio::prelude::*;
-//! use tokio_beanstalkd::*;
-//!
+//! # extern crate tokio;
+//! # extern crate futures;
+//! # extern crate tokio_beanstalkd;
+//! # use tokio::prelude::*;
+//! # use tokio_beanstalkd::*;
 //! # fn consumer_commands() {
-//!      let mut rt = tokio::runtime::Runtime::new().unwrap();
-//!      let bean = rt.block_on(
-//!          Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()).and_then(|bean| {
-//!              bean.put(0, 1, 100, &b"data"[..])
-//!                  .inspect(|(_, response)| {
-//!                      response.as_ref().unwrap();
-//!                  }).and_then(|(bean, _)| bean.reserve())
-//!                  .inspect(|(_, response)| assert_eq!(response.as_ref().unwrap().data, b"data"))
-//!                  .and_then(|(bean, response)| bean.touch(response.unwrap().id))
-//!                  .inspect(|(_, response)| {
-//!                      response.as_ref().unwrap();
-//!                  }).and_then(|(bean, _)| {
-//!                      // how about another one?
-//!                      bean.put(0, 1, 100, &b"more data"[..])
-//!                  }).and_then(|(bean, _)| bean.reserve())
-//!                  .and_then(|(bean, response)| bean.release(response.unwrap().id, 10, 10))
-//!                  .inspect(|(_, response)| {
-//!                      response.as_ref().unwrap();
-//!                  }).and_then(|(bean, _)| bean.reserve())
-//!                  .and_then(|(bean, response)| bean.bury(response.unwrap().id, 10))
-//!                  .inspect(|(_, response)| {
-//!                      response.as_ref().unwrap();
-//!                  }).and_then(|(bean, _)| {
-//!                      // how about another one?
-//!                      bean.put(0, 1, 100, &b"more data"[..])
-//!                  }).inspect(|(_, response)| {
-//!                      response.as_ref().unwrap();
-//!                  }).and_then(|(bean, response)| bean.delete(response.unwrap()))
-//!                  .inspect(|(_, response)| {
-//!                      // assert_eq!(*e, error::Consumer::NotFound);
-//!                      response.as_ref().unwrap();
-//!                  }).and_then(|(bean, _)| bean.watch("test"))
-//!                  .inspect(|(_, response)| assert_eq!(*response.as_ref().unwrap(), 2))
-//!                  .and_then(|(bean, _)| bean.ignore("test"))
-//!                  .inspect(|(_, response)| {
-//!                      assert_eq!(*response.as_ref().unwrap(), 1)
-//!                  })
-//!          }),
-//!      );
-//!      assert!(!bean.is_err());
-//!      drop(bean);
-//!      rt.shutdown_on_idle();
+//! let mut rt = tokio::runtime::Runtime::new().unwrap();
+//! let bean = rt.block_on(
+//!     Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()).and_then(|bean| {
+//!         bean.put(0, 1, 100, &b"update:42"[..])
+//!             .inspect(|(_, response)| {
+//!                 response.as_ref().unwrap();
+//!             })
+//!             .and_then(|(bean, _)| {
+//!                 // Use a particular tube
+//!                 bean.using("notifications")
+//!             }).and_then(|(bean, _)| bean.put(0, 1, 100, &b"notify:100"[..]))
+//!     }),
+//! );
+//! rt.shutdown_on_idle();
+//! # }
+//! ```
+//! 
+//! And a worker could look something like this:
+//! ```no_run
+//! # extern crate tokio;
+//! # extern crate futures;
+//! # extern crate tokio_beanstalkd;
+//! # use tokio::prelude::*;
+//! # use tokio_beanstalkd::*;
+//! # fn consumer_commands() {
+//!  let mut rt = tokio::runtime::Runtime::new().unwrap();
+//!  let bean = rt.block_on(
+//!      Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()).and_then(|bean| {
+//!          bean.reserve()
+//!              .inspect(|(_, response)| {
+//!                  // Do something with the response
+//!              }).and_then(|(bean, response)| {
+//!                  // Delete the job once it is done
+//!                  bean.delete(response.as_ref().unwrap().id)
+//!              })
+//!      }),
+//!  );
+//!  rt.shutdown_on_idle();
 //! # }
 //! ```
 
@@ -483,7 +477,7 @@ mod tests {
         }
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         let bean = rt.block_on(
-            Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()).and_then(|bean| {
+            Beanstalkd::connect(&"127.0.0.1:11300".parse().expect("Unable to connect to Beanstalkd")).and_then(|bean| {
                 // Let put a job in
                 bean.put(0, 1, 100, &b"data"[..])
                     .inspect(|(_, response)| assert!(response.is_ok()))
@@ -496,10 +490,7 @@ mod tests {
                         // Let's watch a particular tube
                         bean.using("test")
                     })
-                    .inspect(|(_, response)| match response {
-                        Ok(v) => assert_eq!(v, "test"),
-                        Err(e) => panic!("Unexpected error: {}", e),
-                    })
+                    .inspect(|(_, response)| assert_eq!(response.as_ref().unwrap(), "test"))
             }),
         );
         assert!(!bean.is_err());
@@ -514,7 +505,7 @@ mod tests {
         }
         let mut rt = tokio::runtime::Runtime::new().unwrap();
         let bean = rt.block_on(
-            Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()).and_then(|bean| {
+            Beanstalkd::connect(&"127.0.0.1:11300".parse().expect("Unable to connect to Beanstalkd")).and_then(|bean| {
                 bean.put(0, 1, 100, &b"data"[..])
                     .inspect(|(_, response)| {
                         response.as_ref().unwrap();
@@ -546,7 +537,9 @@ mod tests {
                     .and_then(|(bean, _)| bean.watch("test"))
                     .inspect(|(_, response)| assert_eq!(*response.as_ref().unwrap(), 2))
                     .and_then(|(bean, _)| bean.ignore("test"))
-                    .inspect(|(_, response)| assert_eq!(*response.as_ref().unwrap(), 1))
+                    .inspect(|(_, response)| {
+                        assert_eq!(*response.as_ref().unwrap(), 1)
+                    })
             }),
         );
         assert!(!bean.is_err());

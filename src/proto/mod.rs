@@ -17,8 +17,17 @@ pub use self::response::*;
 use self::error::{Decode, ErrorKind, ParsingError, ProtocolError};
 use self::response::{Job, PreJob};
 
+/// A Tube is a way of separating different types of jobs in Beanstalkd.
+/// 
+///  The clinet can use a particular tube by calling [`using`][using] and Beanstalkd will create a 
+/// new tube if one does not already exist with that name. Workers can [`watch`][watch] particular 
+/// tubes and receive jobs only from those tubes.
+/// 
+/// [using]: struct.Beanstalkd.html#method.using
+/// [watch]: struct.Beanstalkd.html#method.watch
 pub type Tube = String;
 
+/// The ID of a job assigned by Beanstalkd
 pub type Id = u32;
 
 #[derive(Debug, Clone)]
