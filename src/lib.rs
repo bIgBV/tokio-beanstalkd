@@ -454,14 +454,17 @@ impl Beanstalkd {
 
     /// The peek command let the client inspect a job in the system. There are four
     /// variations ([PeekType][tokio_beanstalkd::PeekType]). All but the first operate only on the currently used tube.
-    /// 
+    ///
     /// This lets you get the information regarding the given type of a job
-    pub fn peek(self, peek_type: PeekType) -> impl Future<Item = (Self, Result<Job, Consumer>), Error = failure::Error> {
+    pub fn peek(
+        self,
+        peek_type: PeekType,
+    ) -> impl Future<Item = (Self, Result<Job, Consumer>), Error = failure::Error> {
         let request = match peek_type {
             PeekType::Ready => Request::PeekReady,
             PeekType::Delayed => Request::PeekDelay,
             PeekType::Buried => Request::PeekBuried,
-            PeekType::Normal(id) => Request::Peek{id}
+            PeekType::Normal(id) => Request::Peek { id },
         };
 
         self.connection
@@ -494,7 +497,7 @@ pub enum PeekType {
     Buried,
 
     /// The job with the given Id
-    Normal(Id)
+    Normal(Id),
 }
 
 #[cfg(test)]
@@ -557,32 +560,90 @@ mod tests {
                     .parse()
                     .expect("Unable to connect to Beanstalkd"),
             ).and_then(|bean| {
+                // [put][tokio_beanstalkd::put] test
                 bean.put(0, 1, 100, &b"data"[..])
                     .inspect(|(_, response)| {
                         response.as_ref().unwrap();
-                    }).and_then(|(bean, _)| bean.reserve())
+                    })
+
+                    // [reserve][tokio_beanstalkd::reserve] test
+                    .and_then(|(bean, _)| bean.reserve())
                     .inspect(|(_, response)| assert_eq!(response.as_ref().unwrap().data, b"data"))
+
+                    // [peek][tokio_beanstalkd::peek] test with PeekType::Normal
+                    .and_then(|(bean, response)| bean.peek(PeekType::Normal(response.as_ref().unwrap().id)))
+                    .inspect(|(_, response)| {
+                        match response.as_ref() {
+                            Ok(_job) => assert!(true),
+                            Err(e) => panic!("Got err: {:?}", e)
+                        }
+                    })
+
+                    // [touch][tokio_beanstalkd::touch] test
                     .and_then(|(bean, response)| bean.touch(response.unwrap().id))
                     .inspect(|(_, response)| {
                         response.as_ref().unwrap();
-                    }).and_then(|(bean, _)| {
+                    })
+
+                    // [put][tokio_beanstalkd::put] test
+                    .and_then(|(bean, _)| {
                         // how about another one?
                         bean.put(0, 1, 100, &b"more data"[..])
-                    }).and_then(|(bean, _)| bean.reserve())
+                    })
+
+                    // [peek][tokio_beanstalkd::peek] PeekType::Ready test
+                    .and_then(|(bean, _)| bean.peek(PeekType::Ready))
+                    .inspect(|(_, response)| {
+                        match response.as_ref() {
+                            Ok(_job) => assert!(true),
+                            Err(e) => panic!("Got err: {:?}", e)
+                        }
+                    })
+                    // [release][tokio_beanstalkd::release] test
+                    .and_then(|(bean, _)| bean.reserve())
                     .and_then(|(bean, response)| bean.release(response.unwrap().id, 10, 10))
                     .inspect(|(_, response)| {
                         response.as_ref().unwrap();
-                    }).and_then(|(bean, _)| bean.reserve())
+                    })
+
+                    // [bury][tokio_beanstalkd::bury] test
+                    .and_then(|(bean, _)| bean.reserve())
                     .and_then(|(bean, response)| bean.bury(response.unwrap().id, 10))
                     .inspect(|(_, response)| {
                         response.as_ref().unwrap();
-                    }).and_then(|(bean, response)| bean.delete(100))
+                    })
+
+                    // [delete][tokio_beanstalkd::delete] test
+                    .and_then(|(bean, _response)| bean.delete(100))
                     .inspect(|(_, response)| {
                         assert_eq!(*response, Err(errors::Consumer::NotFound));
-                    }).and_then(|(bean, _)| bean.watch("test"))
+                    })
+
+                    // [watch][tokio_beanstalkd::watch] test
+                    .and_then(|(bean, _)| bean.watch("test"))
                     .inspect(|(_, response)| assert_eq!(*response.as_ref().unwrap(), 2))
+
+                    // [ignore][tokio_beanstalkd::ignore] test
                     .and_then(|(bean, _)| bean.ignore("test"))
                     .inspect(|(_, response)| assert_eq!(*response.as_ref().unwrap(), 1))
+
+                    // [peek][tokio_beanstalkd::peek] PeekType::Buried test
+                    .and_then(|(bean, _)| bean.peek(PeekType::Buried))
+                    .inspect(|(_, response)| {
+                        match response.as_ref() {
+                            Ok(_job) => assert!(true),
+                            Err(e) => panic!("Got err: {:?}", e)
+                        }
+                    })
+
+                    // [peek][tokio_beanstalkd::peek] PeekType::Delayed test
+                    .and_then(|(bean, _)| bean.peek(PeekType::Delayed))
+                    .inspect(|(_, response)| {
+                        match response.as_ref() {
+                            Ok(_job) => assert!(true),
+                            Err(e) => panic!("Got err: {:?}", e)
+                        }
+                    })
             }),
         );
         assert!(!bean.is_err());

@@ -98,7 +98,7 @@ impl CommandCodec {
                 )?)),
                 "FOUND" => Ok(AnyResponse::Pre(parse_pre_job(
                     &list[1..],
-                    response::PreResponse::Peek
+                    response::PreResponse::Peek,
                 )?)),
                 _ => Err(ErrorKind::Parsing(ParsingError::UnknownResponse))?,
             };

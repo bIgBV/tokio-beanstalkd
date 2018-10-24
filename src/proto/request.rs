@@ -105,7 +105,7 @@ impl fmt::Display for Request {
             Request::Ignore { tube } => write!(f, "ignore {}\r\n", tube),
             Request::Peek { id } => write!(f, "peek {}\r\n", id),
             Request::PeekReady => write!(f, "peek-ready\r\n"),
-            Request::PeekDelay => write!(f, "peek-delay\r\n"),
+            Request::PeekDelay => write!(f, "peek-delayed\r\n"),
             Request::PeekBuried => write!(f, "peek-buried\r\n"),
         }
     }
