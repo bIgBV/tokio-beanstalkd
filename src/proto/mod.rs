@@ -41,48 +41,61 @@ impl CommandCodec {
         CommandCodec { outstart: 0 }
     }
 
+    /// Helper method which handles all single word responses
+    fn single_word_response(&self, list: &[&str]) -> Result<AnyResponse, Decode> {
+        match list[0] {
+            "OUT_OF_MEMORY" => Err(ErrorKind::Protocol(ProtocolError::OutOfMemory))?,
+            "INTERNAL_ERROR" => Err(ErrorKind::Protocol(ProtocolError::InternalError))?,
+            "BAD_FORMAT" => Err(ErrorKind::Protocol(ProtocolError::BadFormat))?,
+            "UNKNOWN_COMMAND" => Err(ErrorKind::Protocol(ProtocolError::UnknownCommand))?,
+            "EXPECTED_CRLF" => Err(ErrorKind::Protocol(ProtocolError::ExpectedCRLF))?,
+            "JOB_TOO_BIG" => Err(ErrorKind::Protocol(ProtocolError::JobTooBig))?,
+            "DRAINING" => Err(ErrorKind::Protocol(ProtocolError::Draining))?,
+            "NOT_FOUND" => Err(ErrorKind::Protocol(ProtocolError::NotFound))?,
+            "NOT_IGNORED" => Err(ErrorKind::Protocol(ProtocolError::NotIgnored))?,
+            "BURIED" => Ok(AnyResponse::Buried),
+            "TOUCHED" => Ok(AnyResponse::Touched),
+            "RELEASED" => Ok(AnyResponse::Released),
+            "DELETED" => Ok(AnyResponse::Deleted),
+            _ => Err(ErrorKind::Parsing(ParsingError::UnknownResponse))?,
+        }
+    }
+
+    /// Helper method which handles all two word responses
+    fn two_word_response(&self, list: &[&str]) -> Result<AnyResponse, Decode> {
+        match list[0] {
+            "INSERTED" => {
+                let id: u32 =
+                    u32::from_str(list[1]).context(ErrorKind::Parsing(ParsingError::ParseId))?;
+                Ok(AnyResponse::Inserted(id))
+            }
+            "WATCHING" => {
+                let count =
+                    u32::from_str(list[1]).context(ErrorKind::Parsing(ParsingError::ParseId))?;
+                Ok(AnyResponse::Watching(count))
+            }
+            "USING" => Ok(AnyResponse::Using(String::from(list[1]))),
+            _ => Err(ErrorKind::Parsing(ParsingError::UnknownResponse))?,
+        }
+    }
+
     fn parse_response(&self, list: &[&str]) -> Result<AnyResponse, Decode> {
         eprintln!("Parsing: {:?}", list);
         if list.len() == 1 {
-            return match list[0] {
-                "OUT_OF_MEMORY" => Err(ErrorKind::Protocol(ProtocolError::OutOfMemory))?,
-                "INTERNAL_ERROR" => Err(ErrorKind::Protocol(ProtocolError::InternalError))?,
-                "BAD_FORMAT" => Err(ErrorKind::Protocol(ProtocolError::BadFormat))?,
-                "UNKNOWN_COMMAND" => Err(ErrorKind::Protocol(ProtocolError::UnknownCommand))?,
-                "EXPECTED_CRLF" => Err(ErrorKind::Protocol(ProtocolError::ExpectedCRLF))?,
-                "JOB_TOO_BIG" => Err(ErrorKind::Protocol(ProtocolError::JobTooBig))?,
-                "DRAINING" => Err(ErrorKind::Protocol(ProtocolError::Draining))?,
-                "NOT_FOUND" => Err(ErrorKind::Protocol(ProtocolError::NotFound))?,
-                "NOT_IGNORED" => Err(ErrorKind::Protocol(ProtocolError::NotIgnored))?,
-                "BURIED" => Ok(AnyResponse::Buried),
-                "TOUCHED" => Ok(AnyResponse::Touched),
-                "RELEASED" => Ok(AnyResponse::Released),
-                "DELETED" => Ok(AnyResponse::Deleted),
-                _ => Err(ErrorKind::Parsing(ParsingError::UnknownResponse))?,
-            };
+            return self.single_word_response(list);
         }
 
         if list.len() == 2 {
             eprintln!("Parsing: {:?}", list[1]);
-            return match list[0] {
-                "INSERTED" => {
-                    let id: u32 = u32::from_str(list[1])
-                        .context(ErrorKind::Parsing(ParsingError::ParseId))?;
-                    Ok(AnyResponse::Inserted(id))
-                }
-                "WATCHING" => {
-                    let count = u32::from_str(list[1])
-                        .context(ErrorKind::Parsing(ParsingError::ParseId))?;
-                    Ok(AnyResponse::Watching(count))
-                }
-                "USING" => Ok(AnyResponse::Using(String::from(list[1]))),
-                _ => Err(ErrorKind::Parsing(ParsingError::UnknownResponse))?,
-            };
+            return self.two_word_response(list);
         }
 
         if list.len() == 3 {
             return match list[0] {
-                "RESERVED" => Ok(AnyResponse::Pre(parse_pre_job(&list[1..])?)),
+                "RESERVED" => Ok(AnyResponse::Pre(parse_pre_job(
+                    &list[1..],
+                    response::PreResponse::Reserved,
+                )?)),
                 _ => Err(ErrorKind::Parsing(ParsingError::UnknownResponse))?,
             };
         }
@@ -105,12 +118,36 @@ impl CommandCodec {
         self.outstart += src.len();
         Ok(None)
     }
+
+    fn handle_job_response(
+        &mut self,
+        response: AnyResponse,
+        src: &mut BytesMut,
+    ) -> Result<Option<AnyResponse>, Decode> {
+        if let AnyResponse::Pre(pre) = response {
+            if let Some(job) = self.parse_job(src, &pre)? {
+                self.outstart = 0;
+                src.clear();
+                Ok(Some(pre.to_anyresponse(job)))
+            } else {
+                Ok(None)
+            }
+        } else {
+            self.outstart = 0;
+            src.clear();
+            Ok(Some(response))
+        }
+    }
 }
 
-fn parse_pre_job(list: &[&str]) -> Result<PreJob, Decode> {
+fn parse_pre_job(list: &[&str], response_type: response::PreResponse) -> Result<PreJob, Decode> {
     let id = u32::from_str(list[0]).context(ErrorKind::Parsing(ParsingError::ParseId))?;
     let bytes = usize::from_str(list[1]).context(ErrorKind::Parsing(ParsingError::ParseId))?;
-    Ok(PreJob { id, bytes })
+    Ok(PreJob {
+        id,
+        bytes,
+        response_type,
+    })
 }
 
 impl Decoder for CommandCodec {
@@ -133,22 +170,7 @@ impl Decoder for CommandCodec {
                 eprintln!("Got response: {:?}", response);
                 // Since the actual job data is on a second line, we need additional parsing
                 // extract it from the buffer.
-                match response {
-                    AnyResponse::Pre(pre) => {
-                        if let Some(job) = self.parse_job(src, &pre)? {
-                            self.outstart = 0;
-                            src.clear();
-                            return Ok(Some(AnyResponse::Reserved(job)));
-                        } else {
-                            return Ok(None);
-                        }
-                    }
-                    _ => {
-                        self.outstart = 0;
-                        src.clear();
-                        return Ok(Some(response));
-                    }
-                };
+                return self.handle_job_response(response, src);
             }
         }
         self.outstart = src.len();
