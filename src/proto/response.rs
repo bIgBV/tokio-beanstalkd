@@ -2,7 +2,7 @@
 
 /// This is an internal type which is not returned by tokio-beanstalkd.
 /// It is used when parsing the job data returned by Beanstald.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct PreJob {
     pub id: super::Id,
     pub bytes: usize,

@@ -101,7 +101,7 @@ use std::net::SocketAddr;
 use proto::error as proto_error;
 pub use proto::response::*;
 pub use proto::{Id, Tube};
-use proto_error::{ErrorKind, ParsingError, ProtocolError};
+use proto_error::{ErrorKind, ProtocolError};
 // Request doesn't have to be a public type
 use proto::Request;
 
@@ -143,7 +143,7 @@ impl Beanstalkd {
     pub fn connect(addr: &SocketAddr) -> impl Future<Item = Self, Error = failure::Error> {
         tokio::net::TcpStream::connect(addr)
             .map_err(failure::Error::from)
-            .map(|stream| Beanstalkd::setup(stream))
+            .map(Beanstalkd::setup)
     }
 
     fn setup(stream: tokio::net::TcpStream) -> Self {

@@ -41,7 +41,7 @@ impl CommandCodec {
         CommandCodec { outstart: 0 }
     }
 
-    fn parse_response(&self, list: Vec<&str>) -> Result<AnyResponse, Decode> {
+    fn parse_response(&self, list: &[&str]) -> Result<AnyResponse, Decode> {
         eprintln!("Parsing: {:?}", list);
         if list.len() == 1 {
             return match list[0] {
@@ -82,7 +82,7 @@ impl CommandCodec {
 
         if list.len() == 3 {
             return match list[0] {
-                "RESERVED" => Ok(AnyResponse::Pre(parse_pre_job(list[1..].to_vec())?)),
+                "RESERVED" => Ok(AnyResponse::Pre(parse_pre_job(&list[1..])?)),
                 _ => Err(ErrorKind::Parsing(ParsingError::UnknownResponse))?,
             };
         }
@@ -90,11 +90,11 @@ impl CommandCodec {
         Err(ErrorKind::Parsing(ParsingError::UnknownResponse))?
     }
 
-    fn parse_job(&mut self, src: &mut BytesMut, pre: PreJob) -> Result<Option<Job>, Decode> {
+    fn parse_job(&mut self, src: &mut BytesMut, pre: &PreJob) -> Result<Option<Job>, Decode> {
         if let Some(carriage_offset) = src.iter().position(|b| *b == b'\r') {
             if src[carriage_offset + 1] == b'\n' {
                 let line = utf8(src).context(ErrorKind::Parsing(ParsingError::ParseString))?;
-                let line: Vec<&str> = line.trim().split(" ").collect();
+                let line: Vec<&str> = line.trim().split(' ').collect();
                 return Ok(Some(Job {
                     id: pre.id,
                     bytes: pre.bytes,
@@ -107,7 +107,7 @@ impl CommandCodec {
     }
 }
 
-fn parse_pre_job(list: Vec<&str>) -> Result<PreJob, Decode> {
+fn parse_pre_job(list: &[&str]) -> Result<PreJob, Decode> {
     let id = u32::from_str(list[0]).context(ErrorKind::Parsing(ParsingError::ParseId))?;
     let bytes = usize::from_str(list[1]).context(ErrorKind::Parsing(ParsingError::ParseId))?;
     Ok(PreJob { id, bytes })
@@ -126,16 +126,16 @@ impl Decoder for CommandCodec {
                 let offset = self.outstart + carriage_offset + 1 + 1;
                 let line = src.split_to(offset);
                 let line = utf8(&line).context(ErrorKind::Parsing(ParsingError::ParseString))?;
-                let line = line.trim().split(" ").collect();
+                let line: Vec<&str> = line.trim().split(' ').collect();
 
-                let response = self.parse_response(line)?;
+                let response = self.parse_response(&line[..])?;
 
                 eprintln!("Got response: {:?}", response);
                 // Since the actual job data is on a second line, we need additional parsing
                 // extract it from the buffer.
                 match response {
                     AnyResponse::Pre(pre) => {
-                        if let Some(job) = self.parse_job(src, pre)? {
+                        if let Some(job) = self.parse_job(src, &pre)? {
                             self.outstart = 0;
                             src.clear();
                             return Ok(Some(AnyResponse::Reserved(job)));
@@ -154,8 +154,7 @@ impl Decoder for CommandCodec {
         self.outstart = src.len();
         src.clear();
 
-        // TODO: Just Ok(None) is enough
-        return Ok(None);
+        Ok(None)
     }
 }
 

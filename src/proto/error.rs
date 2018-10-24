@@ -68,7 +68,7 @@ impl From<ErrorKind> for Decode {
 
 // Why do I have to implement this?
 impl From<io::Error> for Decode {
-    fn from(kind: io::Error) -> Decode {
+    fn from(_kind: io::Error) -> Decode {
         Decode {
             inner: Context::new(ErrorKind::Parsing(ParsingError::ParseString)),
         }
