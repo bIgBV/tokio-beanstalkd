@@ -136,6 +136,7 @@ pub struct Beanstalkd {
     connection: Framed<tokio::net::TcpStream, proto::CommandCodec>,
 }
 
+// FIXME: log out unexpected errors using env_logger
 impl Beanstalkd {
     /// Connect to a Beanstalkd instance.
     ///
@@ -450,6 +451,50 @@ impl Beanstalkd {
                 })
             })
     }
+
+    /// The peek command let the client inspect a job in the system. There are four
+    /// variations ([PeekType][tokio_beanstalkd::PeekType]). All but the first operate only on the currently used tube.
+    /// 
+    /// This lets you get the information regarding the given type of a job
+    pub fn peek(self, peek_type: PeekType) -> impl Future<Item = (Self, Result<Job, Consumer>), Error = failure::Error> {
+        let request = match peek_type {
+            PeekType::Ready => Request::PeekReady,
+            PeekType::Delayed => Request::PeekDelay,
+            PeekType::Buried => Request::PeekBuried,
+            PeekType::Normal(id) => Request::Peek{id}
+        };
+
+        self.connection
+            .send(request)
+            .and_then(|conn| {
+                handle_response!(conn, {
+                    AnyResponse::Found(job) => Ok(job),
+                    _r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
+                }, {
+                    ErrorKind::Protocol(ProtocolError::BadFormat) => Err(Consumer::Beanstalk{error: BeanstalkError::BadFormat}),
+                    ErrorKind::Protocol(ProtocolError::OutOfMemory) => Err(Consumer::Beanstalk{error: BeanstalkError::OutOfMemory}),
+                    ErrorKind::Protocol(ProtocolError::InternalError) => Err(Consumer::Beanstalk{error: BeanstalkError::InternalError}),
+                    ErrorKind::Protocol(ProtocolError::UnknownCommand) => Err(Consumer::Beanstalk{error: BeanstalkError::UnknownCommand}),
+                    ErrorKind::Protocol(ProtocolError::NotFound) => Err(Consumer::NotFound),
+                    _r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
+                })
+            })
+    }
+}
+
+/// The type of [peek][tokio_beanstalkd::peek] request you want to make
+pub enum PeekType {
+    /// The next ready job
+    Ready,
+
+    /// The next delayed job
+    Delayed,
+
+    /// The next bufied job
+    Buried,
+
+    /// The job with the given Id
+    Normal(Id)
 }
 
 #[cfg(test)]

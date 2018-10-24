@@ -3,11 +3,11 @@
 /// [pre]: [tokio_beanstalkd::proto::response::PreJob]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum PreResponse {
+    /// A response for a reserve request
     Reserved,
+
+    /// All types of peek requests have the same response
     Peek,
-    PeekReady,
-    PeekDelayed,
-    PeekBuried,
 }
 
 /// This is an internal type which is not returned by tokio-beanstalkd.
@@ -37,8 +37,7 @@ impl PreJob {
     pub(crate) fn to_anyresponse(self, job: Job) -> AnyResponse {
         match self.response_type {
             PreResponse::Reserved => AnyResponse::Reserved(job),
-            // FIXME: handle all other response types.
-            _ => AnyResponse::Reserved(job)
+            PreResponse::Peek => AnyResponse::Found(job),
         }
     }
 }
