@@ -12,17 +12,13 @@
 //!
 //! ## Operation
 //! This library can serve as a client for both the application and the worker. The application would
-//! [`put`][put] jobs on the queue and the workers can [`reserve`][reserve] them. Once they are done with the job, they
-//! have to [`delete`][delete] job. This is required for every job, or else Beanstalkd will not remove it from
-//! its internal datastructres.
+//! [`put`](tokio_beanstalkd::put) jobs on the queue and the workers can [`reserve`](tokio_beanstalkd::put)
+//! them. Once they are done with the job, they have to [`delete`](tokio_beanstalkd::delete) job.
+//! This is required for every job, or else Beanstalkd will not remove it fromits internal datastructres.
 //!
-//! [put]: struct.Beanstalkd.html#method.put
-//! [reserve]: struct.Beanstalkd.html#method.reserve
-//! [delete]: struct.Beanstalkd.html#method.delete
-//!
-//! If a worker cannot finish the job in it's TTR (Time To Run), then it can [`release`](release) the job. The
-//! application can use the [`using`](using) method to put jobs in a specific tube, and workers can use `watch`
-//! to only reserve jobs from the specified tubes.
+//! If a worker cannot finish the job in it's TTR (Time To Run), then it can [`release`](tokio_beanstalkd::release)
+//! the job. Theapplication can use the [`using`](tokio_beanstalkd::using) method to put jobs in a specific tube,
+//! and workers can use [watch](tokio_beanstalkd::watch)
 //!
 //! [release]: struct.Beanstalkd.html#method.release
 //! [using]: struct.Beanstalkd.html#method.using
@@ -214,12 +210,12 @@ impl Beanstalkd {
             })
     }
 
-    /// Reserve a [job](struct.Job.html) to process.
+    /// Reserve a [job](tokio_beanstalkd::response::Job) to process.
     ///
     /// A process that wants to consume jobs from the queue uses `reserve`,
-    /// [delete](struct.Beanstalkd.html#method.delete),
-    /// [release](struct.Beanstalkd.html#method.release), and
-    /// [bury](struct.Beanstalkd.html#method.bury).
+    /// `[delete](tokio_beanstalkd::delete)`,
+    /// `[release](tokio_beanstalkd::release)`, and
+    /// `[bury](tokio_beanstalkd::bury)`.
     pub fn reserve(
         self,
     ) -> impl Future<Item = (Self, Result<Job, Consumer>), Error = failure::Error> {
@@ -452,10 +448,9 @@ impl Beanstalkd {
             })
     }
 
-    /// The peek command let the client inspect a job in the system. There are four
-    /// variations ([PeekType][tokio_beanstalkd::PeekType]). All but the first operate only on the currently used tube.
-    ///
-    /// This lets you get the information regarding the given type of a job
+    /// The peek command lets the client inspect a job in the system. There are four
+    /// types of jobs as enumerated in [PeekType](tokio_beanstalkd::PeekType). All but the
+    /// first operate only on the currently used tube.
     pub fn peek(
         self,
         peek_type: PeekType,

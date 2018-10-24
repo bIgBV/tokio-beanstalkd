@@ -32,6 +32,10 @@ pub struct Job {
     pub data: Vec<u8>,
 }
 
+pub struct Stats {
+
+}
+
 impl PreJob {
     /// Simple method to match a given PreJob to the right Response
     pub(crate) fn to_anyresponse(self, job: Job) -> AnyResponse {
