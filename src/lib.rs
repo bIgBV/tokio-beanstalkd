@@ -212,6 +212,8 @@ impl Beanstalkd {
 
     /// Reserve a [job](tokio_beanstalkd::response::Job) to process.
     ///
+    /// FIXME: need to handle different responses returned at different TTR vs reserve-with-timeout times
+    ///
     /// A process that wants to consume jobs from the queue uses `reserve`,
     /// `[delete](tokio_beanstalkd::delete)`,
     /// `[release](tokio_beanstalkd::release)`, and
@@ -451,6 +453,11 @@ impl Beanstalkd {
     /// The peek command lets the client inspect a job in the system. There are four
     /// types of jobs as enumerated in [PeekType](tokio_beanstalkd::PeekType). All but the
     /// first operate only on the currently used tube.
+    ///
+    /// * It takes a [PeekType](tokio_beanstalkd::PeekType) representing the type of peek
+    /// operation to perform
+    ///
+    /// * And returns a [Job](tokio_beanstalkd::response::job) on success.
     pub fn peek(
         self,
         peek_type: PeekType,
@@ -477,6 +484,61 @@ impl Beanstalkd {
                     _r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
                 })
             })
+    }
+
+    /// The kick command applies only to the currently used tube. It moves jobs into
+    /// the ready queue. If there are any buried jobs, it will only kick buried jobs.
+    /// Otherwise it will kick delayed jobs.
+    ///
+    /// * It takes a `bound` which is the number of jobs it will kick
+    /// * The response is a u32 representing the number of jobs kicked by the server
+    pub fn kick(
+        self,
+        bound: u32,
+    ) -> impl Future<Item = (Self, Result<u32, Consumer>), Error = failure::Error> {
+        self.connection
+            .send(Request::Kick{ bound })
+            .and_then(|conn| {
+                handle_response!(conn, {
+                    AnyResponse::Kicked(count) => Ok(count),
+                    _r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
+                }, {
+                    ErrorKind::Protocol(ProtocolError::BadFormat) => Err(Consumer::Beanstalk{error: BeanstalkError::BadFormat}),
+                    ErrorKind::Protocol(ProtocolError::OutOfMemory) => Err(Consumer::Beanstalk{error: BeanstalkError::OutOfMemory}),
+                    ErrorKind::Protocol(ProtocolError::InternalError) => Err(Consumer::Beanstalk{error: BeanstalkError::InternalError}),
+                    ErrorKind::Protocol(ProtocolError::UnknownCommand) => Err(Consumer::Beanstalk{error: BeanstalkError::UnknownCommand}),
+                    ErrorKind::Protocol(ProtocolError::NotFound) => Err(Consumer::NotFound),
+                    _r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
+            })
+        })
+    }
+
+    /// The kick-job command is a variant of kick that operates with a single job
+    /// identified by its job id. If the given job id exists and is in a buried or
+    /// delayed state, it will be moved to the ready queue of the the same tube where it
+    /// currently belongs.
+    ///
+    /// * It takes an `id` of the job to be kicked
+    /// * And returns `()` on success
+    pub fn kick_job(
+        self,
+        id: Id,
+    ) -> impl Future<Item = (Self, Result<(), Consumer>), Error = failure::Error> {
+        self.connection
+            .send(Request::KickJob { id })
+            .and_then(|conn| {
+                handle_response!(conn, {
+                    AnyResponse::JobKicked => Ok(()),
+                    _r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
+                }, {
+                    ErrorKind::Protocol(ProtocolError::BadFormat) => Err(Consumer::Beanstalk{error: BeanstalkError::BadFormat}),
+                    ErrorKind::Protocol(ProtocolError::OutOfMemory) => Err(Consumer::Beanstalk{error: BeanstalkError::OutOfMemory}),
+                    ErrorKind::Protocol(ProtocolError::InternalError) => Err(Consumer::Beanstalk{error: BeanstalkError::InternalError}),
+                    ErrorKind::Protocol(ProtocolError::UnknownCommand) => Err(Consumer::Beanstalk{error: BeanstalkError::UnknownCommand}),
+                    ErrorKind::Protocol(ProtocolError::NotFound) => Err(Consumer::NotFound),
+                    _r => Err(Consumer::Beanstalk{error: BeanstalkError::UnexpectedResponse})
+            })
+        })
     }
 }
 

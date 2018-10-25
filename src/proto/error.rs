@@ -34,6 +34,9 @@ pub(crate) enum ParsingError {
     /// Error occurred while parsing the data for a Job
     ParseJob,
 
+    /// Error occurred while parsing a number
+    ParseNumber,
+
     /// If some unknown error occurred.
     UnknownResponse,
 }

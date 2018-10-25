@@ -59,6 +59,8 @@ pub(crate) enum AnyResponse {
     Released,
     Touched,
     Found(Job),
+    Kicked(u32),
+    JobKicked,
 
     ConnectionClosed,
     // Custom type used for reserved job response parsing.
