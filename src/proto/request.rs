@@ -39,6 +39,9 @@ pub(crate) enum Request {
     Peek {
         id: super::Id,
     },
+    PeekReady,
+    PeekDelay,
+    PeekBuried,
 }
 
 impl Request {
@@ -57,6 +60,9 @@ impl Request {
                 dst.put(&b"\r\n"[..]);
             }
             Request::Reserve
+            | Request::PeekReady
+            | Request::PeekDelay
+            | Request::PeekBuried
             | Request::Use { .. }
             | Request::Delete { .. }
             | Request::Release { .. }
@@ -98,6 +104,9 @@ impl fmt::Display for Request {
             Request::Watch { tube } => write!(f, "watch {}\r\n", tube),
             Request::Ignore { tube } => write!(f, "ignore {}\r\n", tube),
             Request::Peek { id } => write!(f, "peek {}\r\n", id),
+            Request::PeekReady => write!(f, "peek-ready\r\n"),
+            Request::PeekDelay => write!(f, "peek-delayed\r\n"),
+            Request::PeekBuried => write!(f, "peek-buried\r\n"),
         }
     }
 }
