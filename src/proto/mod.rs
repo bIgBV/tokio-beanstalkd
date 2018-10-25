@@ -77,7 +77,8 @@ impl CommandCodec {
             }
             "USING" => Ok(AnyResponse::Using(String::from(list[1]))),
             "KICKED" => {
-                let count: u32 =  u32::from_str(list[1]).context(ErrorKind::Parsing(ParsingError::ParseNumber))?;
+                let count: u32 = u32::from_str(list[1])
+                    .context(ErrorKind::Parsing(ParsingError::ParseNumber))?;
                 Ok(AnyResponse::Kicked(count))
             }
             _ => Err(ErrorKind::Parsing(ParsingError::UnknownResponse))?,

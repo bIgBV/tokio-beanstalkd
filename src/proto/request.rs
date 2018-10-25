@@ -43,11 +43,11 @@ pub(crate) enum Request {
     PeekDelay,
     PeekBuried,
     Kick {
-        bound: u32 // Can this and other u32 values be 64 bits?
+        bound: u32, // Can this and other u32 values be 64 bits?
     },
     KickJob {
         id: super::Id,
-    }
+    },
 }
 
 impl Request {
