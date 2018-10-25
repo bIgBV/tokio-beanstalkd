@@ -57,6 +57,7 @@ impl CommandCodec {
             "TOUCHED" => Ok(AnyResponse::Touched),
             "RELEASED" => Ok(AnyResponse::Released),
             "DELETED" => Ok(AnyResponse::Deleted),
+            "KICKED" => Ok(AnyResponse::JobKicked),
             _ => Err(ErrorKind::Parsing(ParsingError::UnknownResponse))?,
         }
     }
@@ -75,6 +76,11 @@ impl CommandCodec {
                 Ok(AnyResponse::Watching(count))
             }
             "USING" => Ok(AnyResponse::Using(String::from(list[1]))),
+            "KICKED" => {
+                let count: u32 = u32::from_str(list[1])
+                    .context(ErrorKind::Parsing(ParsingError::ParseNumber))?;
+                Ok(AnyResponse::Kicked(count))
+            }
             _ => Err(ErrorKind::Parsing(ParsingError::UnknownResponse))?,
         }
     }

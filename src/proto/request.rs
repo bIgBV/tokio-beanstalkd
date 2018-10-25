@@ -42,6 +42,12 @@ pub(crate) enum Request {
     PeekReady,
     PeekDelay,
     PeekBuried,
+    Kick {
+        bound: u32, // Can this and other u32 values be 64 bits?
+    },
+    KickJob {
+        id: super::Id,
+    },
 }
 
 impl Request {
@@ -70,7 +76,9 @@ impl Request {
             | Request::Touch { .. }
             | Request::Watch { .. }
             | Request::Ignore { .. }
-            | Request::Peek { .. } => {}
+            | Request::Peek { .. }
+            | Request::Kick { .. }
+            | Request::KickJob { .. } => {}
         }
     }
 }
@@ -107,6 +115,8 @@ impl fmt::Display for Request {
             Request::PeekReady => write!(f, "peek-ready\r\n"),
             Request::PeekDelay => write!(f, "peek-delayed\r\n"),
             Request::PeekBuried => write!(f, "peek-buried\r\n"),
+            Request::Kick { bound } => write!(f, "kick {}\r\n", bound),
+            Request::KickJob { id } => write!(f, "kick-job {}\r\n", id),
         }
     }
 }

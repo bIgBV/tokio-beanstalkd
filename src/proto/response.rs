@@ -32,9 +32,7 @@ pub struct Job {
     pub data: Vec<u8>,
 }
 
-pub struct Stats {
-
-}
+pub struct Stats {}
 
 impl PreJob {
     /// Simple method to match a given PreJob to the right Response
@@ -59,6 +57,8 @@ pub(crate) enum AnyResponse {
     Released,
     Touched,
     Found(Job),
+    Kicked(u32),
+    JobKicked,
 
     ConnectionClosed,
     // Custom type used for reserved job response parsing.
