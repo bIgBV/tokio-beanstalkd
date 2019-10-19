@@ -32,51 +32,43 @@
 //! An simple example client could look something like this:
 //!
 //! ```no_run
-//! # extern crate tokio;
-//! # extern crate futures;
-//! # extern crate tokio_beanstalkd;
-//! # use tokio::prelude::*;
 //! # use tokio_beanstalkd::*;
-//! # fn consumer_commands() {
-//! let mut rt = tokio::runtime::Runtime::new().unwrap();
-//! let bean = rt.block_on(
-//!     Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()).and_then(|bean| {
-//!         bean.put(0, 1, 100, &b"update:42"[..])
-//!             .inspect(|(_, response)| {
-//!                 response.as_ref().unwrap();
-//!             })
-//!             .and_then(|(bean, _)| {
-//!                 // Use a particular tube
-//!                 bean.using("notifications")
-//!             }).and_then(|(bean, _)| bean.put(0, 1, 100, &b"notify:100"[..]))
-//!     }),
-//! );
-//! rt.shutdown_on_idle();
-//! # }
+//! #[tokio::main]
+//! async fn main() {
+//!     let mut bean = Beanstalkd::connect(
+//!         &"127.0.0.1:11300"
+//!             .parse()
+//!             .expect("Unable to connect to Beanstalkd"),
+//!     )
+//!     .await
+//!     .unwrap();
+//!
+//!     bean.put(0, 1, 100, &b"update:42"[..]).await.unwrap().unwrap();
+//!
+//!     // Use a particular tube
+//!     bean.using("notifications").await.unwrap().unwrap();
+//!     bean.put(0, 1, 100, &b"notify:100"[..]).await.unwrap().unwrap();
+//! }
 //! ```
 //!
 //! And a worker could look something like this:
 //! ```no_run
-//! # extern crate tokio;
-//! # extern crate futures;
-//! # extern crate tokio_beanstalkd;
-//! # use tokio::prelude::*;
 //! # use tokio_beanstalkd::*;
-//! # fn consumer_commands() {
-//!  let mut rt = tokio::runtime::Runtime::new().unwrap();
-//!  let bean = rt.block_on(
-//!      Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()).and_then(|bean| {
-//!          bean.reserve()
-//!              .inspect(|(_, response)| {
-//!                  // Do something with the response
-//!              }).and_then(|(bean, response)| {
-//!                  // Delete the job once it is done
-//!                  bean.delete(response.as_ref().unwrap().id)
-//!              })
-//!      }),
-//!  );
-//!  rt.shutdown_on_idle();
-//! # }
+//! #[tokio::main]
+//! async fn main() {
+//!     let mut bean = Beanstalkd::connect(
+//!         &"127.0.0.1:11300"
+//!             .parse()
+//!             .expect("Unable to connect to Beanstalkd"),
+//!     )
+//!     .await
+//!     .unwrap();
+//!
+//!     let response = bean.reserve().await.unwrap().unwrap();
+//!     // ... do something with the response ...
+//!     // Delete the job once it is done
+//!     bean.delete(response.id).await.unwrap().unwrap();
+//! }
 //! ```
 
 #![warn(rust_2018_idioms)]
