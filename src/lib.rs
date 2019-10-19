@@ -539,123 +539,83 @@ mod tests {
         }
     }
 
-    #[test]
-    fn it_works() {
+    #[tokio::test]
+    async fn it_works() {
         unsafe {
             spawn_beanstalkd();
         }
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
-        let bean = rt.block_on(
-            Beanstalkd::connect(
-                &"127.0.0.1:11300"
-                    .parse()
-                    .expect("Unable to connect to Beanstalkd"),
-            )
-            .and_then(|bean| {
-                // Let put a job in
-                bean.put(0, 1, 100, &b"data"[..])
-                    .inspect(|(_, response)| assert!(response.is_ok()))
-                    .and_then(|(bean, _)| {
-                        // how about another one?
-                        bean.put(0, 1, 100, &b"more data"[..])
-                    })
-                    .inspect(|(_, response)| assert!(response.is_ok()))
-                    .and_then(|(bean, _)| {
-                        // Let's watch a particular tube
-                        bean.using("test")
-                    })
-                    .inspect(|(_, response)| assert_eq!(response.as_ref().unwrap(), "test"))
-            }),
-        );
-        assert!(!bean.is_err());
-        drop(bean);
-        rt.shutdown_on_idle();
+        let mut bean = Beanstalkd::connect(
+            &"127.0.0.1:11300"
+                .parse()
+                .expect("Unable to connect to Beanstalkd"),
+        )
+        .await
+        .unwrap();
+
+        // Let put a job in
+        bean.put(0, 1, 100, &b"data"[..]).await.unwrap().unwrap();
+        // how about another one?
+        bean.put(0, 1, 100, &b"more data"[..])
+            .await
+            .unwrap()
+            .unwrap();
+        // Let's watch a particular tube
+        let response = bean.using("test").await.unwrap().unwrap();
+        assert_eq!(response, "test");
     }
 
-    #[test]
-    fn consumer_commands() {
+    #[tokio::test]
+    async fn consumer_commands() {
         unsafe {
             spawn_beanstalkd();
         }
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
-        let bean = rt.block_on(
-            Beanstalkd::connect(
-                &"127.0.0.1:11300"
-                    .parse()
-                    .expect("Unable to connect to Beanstalkd"),
-            )
-            .and_then(|bean| {
-                // [put][tokio_beanstalkd::put] test
-                bean.put(0, 1, 100, &b"data"[..])
-                    .inspect(|(_, response)| {
-                        response.as_ref().unwrap();
-                    })
-                    // [reserve][tokio_beanstalkd::reserve] test
-                    .and_then(|(bean, _)| bean.reserve())
-                    .inspect(|(_, response)| assert_eq!(response.as_ref().unwrap().data, b"data"))
-                    // [peek][tokio_beanstalkd::peek] test with PeekType::Normal
-                    .and_then(|(bean, response)| {
-                        bean.peek(PeekType::Normal(response.as_ref().unwrap().id))
-                    })
-                    .inspect(|(_, response)| match response.as_ref() {
-                        Ok(_job) => assert!(true),
-                        Err(e) => panic!("Got err: {:?}", e),
-                    })
-                    // [touch][tokio_beanstalkd::touch] test
-                    .and_then(|(bean, response)| bean.touch(response.unwrap().id))
-                    .inspect(|(_, response)| {
-                        response.as_ref().unwrap();
-                    })
-                    // [put][tokio_beanstalkd::put] test
-                    .and_then(|(bean, _)| {
-                        // how about another one?
-                        bean.put(0, 1, 100, &b"more data"[..])
-                    })
-                    // [peek][tokio_beanstalkd::peek] PeekType::Ready test
-                    .and_then(|(bean, _)| bean.peek(PeekType::Ready))
-                    .inspect(|(_, response)| match response.as_ref() {
-                        Ok(_job) => assert!(true),
-                        Err(e) => panic!("Got err: {:?}", e),
-                    })
-                    // [release][tokio_beanstalkd::release] test
-                    .and_then(|(bean, _)| bean.reserve())
-                    .and_then(|(bean, response)| bean.release(response.unwrap().id, 10, 10))
-                    .inspect(|(_, response)| {
-                        response.as_ref().unwrap();
-                    })
-                    // [bury][tokio_beanstalkd::bury] test
-                    .and_then(|(bean, _)| bean.reserve())
-                    .and_then(|(bean, response)| bean.bury(response.unwrap().id, 10))
-                    .inspect(|(_, response)| {
-                        response.as_ref().unwrap();
-                    })
-                    // [delete][tokio_beanstalkd::delete] test
-                    .and_then(|(bean, _response)| bean.delete(100))
-                    .inspect(|(_, response)| {
-                        assert_eq!(*response, Err(errors::Consumer::NotFound));
-                    })
-                    // [watch][tokio_beanstalkd::watch] test
-                    .and_then(|(bean, _)| bean.watch("test"))
-                    .inspect(|(_, response)| assert_eq!(*response.as_ref().unwrap(), 2))
-                    // [ignore][tokio_beanstalkd::ignore] test
-                    .and_then(|(bean, _)| bean.ignore("test"))
-                    .inspect(|(_, response)| assert_eq!(*response.as_ref().unwrap(), 1))
-                    // [peek][tokio_beanstalkd::peek] PeekType::Buried test
-                    .and_then(|(bean, _)| bean.peek(PeekType::Buried))
-                    .inspect(|(_, response)| match response.as_ref() {
-                        Ok(_job) => assert!(true),
-                        Err(e) => panic!("Got err: {:?}", e),
-                    })
-                    // [peek][tokio_beanstalkd::peek] PeekType::Delayed test
-                    .and_then(|(bean, _)| bean.peek(PeekType::Delayed))
-                    .inspect(|(_, response)| match response.as_ref() {
-                        Ok(_job) => assert!(true),
-                        Err(e) => panic!("Got err: {:?}", e),
-                    })
-            }),
-        );
-        assert!(!bean.is_err());
-        drop(bean);
-        rt.shutdown_on_idle();
+        let mut bean = Beanstalkd::connect(
+            &"127.0.0.1:11300"
+                .parse()
+                .expect("Unable to connect to Beanstalkd"),
+        )
+        .await
+        .unwrap();
+
+        // [put][tokio_beanstalkd::put] test
+        bean.put(0, 1, 100, &b"data"[..]).await.unwrap().unwrap();
+        // [reserve][tokio_beanstalkd::reserve] test
+        let response = bean.reserve().await.unwrap().unwrap();
+        assert_eq!(response.data, b"data");
+        // [peek][tokio_beanstalkd::peek] test with PeekType::Normal
+        let response = bean
+            .peek(PeekType::Normal(response.id))
+            .await
+            .unwrap()
+            .unwrap();
+        // [touch][tokio_beanstalkd::touch] test
+        bean.touch(response.id).await.unwrap().unwrap();
+        // [put][tokio_beanstalkd::put] test
+        // how about another one?
+        bean.put(0, 1, 100, &b"more data"[..])
+            .await
+            .unwrap()
+            .unwrap();
+        // [peek][tokio_beanstalkd::peek] PeekType::Ready test
+        bean.peek(PeekType::Ready).await.unwrap().unwrap();
+        // [release][tokio_beanstalkd::release] test
+        let response = bean.reserve().await.unwrap().unwrap();
+        bean.release(response.id, 10, 10).await.unwrap().unwrap();
+        // [bury][tokio_beanstalkd::bury] test
+        let response = bean.reserve().await.unwrap().unwrap();
+        bean.bury(response.id, 10).await.unwrap().unwrap();
+        // [delete][tokio_beanstalkd::delete] test
+        let e = bean.delete(100).await.unwrap().unwrap_err();
+        assert_eq!(e, errors::Consumer::NotFound);
+        // [watch][tokio_beanstalkd::watch] test
+        let response = bean.watch("test").await.unwrap().unwrap();
+        assert_eq!(response, 2);
+        // [ignore][tokio_beanstalkd::ignore] test
+        let response = bean.ignore("test").await.unwrap().unwrap();
+        assert_eq!(response, 1);
+        // [peek][tokio_beanstalkd::peek] PeekType::Buried test
+        bean.peek(PeekType::Buried).await.unwrap().unwrap();
+        // [peek][tokio_beanstalkd::peek] PeekType::Delayed test
+        bean.peek(PeekType::Delayed).await.unwrap().unwrap();
     }
 }
