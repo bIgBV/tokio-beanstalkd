@@ -43,7 +43,7 @@ pub(crate) enum ParsingError {
 
 /// This helps us keep track of the underlying cause of the error
 impl Fail for Decode {
-    fn cause(&self) -> Option<&Fail> {
+    fn cause(&self) -> Option<&dyn Fail> {
         self.inner.cause()
     }
 
@@ -53,7 +53,7 @@ impl Fail for Decode {
 }
 
 impl Display for Decode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         Display::fmt(&self.inner, f)
     }
 }

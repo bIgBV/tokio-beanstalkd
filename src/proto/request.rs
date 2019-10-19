@@ -84,7 +84,7 @@ impl Request {
 }
 
 impl fmt::Display for Request {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             Request::Put {
                 priority,
