@@ -72,7 +72,10 @@ impl From<ErrorKind> for Decode {
     }
 }
 
-// Why do I have to implement this?
+// From the tokio_codec::Encoder trait docs:
+//
+//      > FramedWrite requires Encoders errors to implement From<io::Error> in the interest letting
+//      > it return Errors directly.
 impl From<io::Error> for Decode {
     fn from(_kind: io::Error) -> Decode {
         Decode {
@@ -99,4 +102,26 @@ pub(crate) enum ProtocolError {
     Draining,
     NotFound,
     NotIgnored,
+    StreamClosed,
+}
+
+/// Custom error type which represents all the various errors which can occur when encoding a
+/// request for the server.
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Fail)]
+pub(crate) enum EncodeError {
+    #[fail(display = "Tube name too long")]
+    TubeNameTooLong,
+
+    #[fail(display = "IO error")]
+    IoError,
+}
+
+// From the tokio_codec::Encoder trait docs:
+//
+//      > FramedWrite requires Encoders errors to implement From<io::Error> in the interest letting
+//      > it return Errors directly.
+impl From<io::Error> for EncodeError {
+    fn from(_error: io::Error) -> Self {
+        EncodeError::IoError
+    }
 }

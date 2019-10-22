@@ -14,7 +14,7 @@ pub(crate) mod response;
 pub(crate) use self::request::Request;
 pub use self::response::*;
 
-use self::error::{Decode, ErrorKind, ParsingError, ProtocolError};
+use self::error::{Decode, EncodeError, ErrorKind, ParsingError, ProtocolError};
 use self::response::{Job, PreJob};
 
 /// A Tube is a way of separating different types of jobs in Beanstalkd.
@@ -192,14 +192,14 @@ impl Decoder for CommandCodec {
 
 impl Encoder for CommandCodec {
     type Item = Request;
-    type Error = failure::Error;
+    type Error = EncodeError;
 
     fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
         eprintln!("Making request: {:?}", item);
         match item {
             Request::Watch { tube } => {
                 if tube.as_bytes().len() > 200 {
-                    bail!("Tube name too long")
+                    return Err(EncodeError::TubeNameTooLong);
                 }
                 item.serialize(dst)
             }
