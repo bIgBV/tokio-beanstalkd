@@ -31,9 +31,6 @@ pub(crate) enum ParsingError {
     /// ASCII names
     ParseString,
 
-    /// Error occurred while parsing the data for a Job
-    ParseJob,
-
     /// Error occurred while parsing a number
     ParseNumber,
 

@@ -58,8 +58,6 @@ pub(crate) enum AnyResponse {
     Found(Job),
     Kicked(u32),
     JobKicked,
-
-    ConnectionClosed,
     // Custom type used for reserved job response parsing.
     Pre(PreJob),
 }
