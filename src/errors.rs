@@ -96,7 +96,6 @@ pub enum Put {
 impl From<Decode> for Put {
     fn from(error: Decode) -> Self {
         match error.kind() {
-            ErrorKind::Protocol(ProtocolError::Buried) => Put::Buried,
             ErrorKind::Protocol(ProtocolError::ExpectedCRLF) => Put::ExpectedCRLF,
             ErrorKind::Protocol(ProtocolError::JobTooBig) => Put::JobTooBig,
             ErrorKind::Protocol(ProtocolError::Draining) => Put::Draining,
@@ -140,7 +139,6 @@ impl From<Decode> for Consumer {
     fn from(error: Decode) -> Self {
         match error.kind() {
             ErrorKind::Protocol(ProtocolError::NotFound) => Consumer::NotFound,
-            ErrorKind::Protocol(ProtocolError::Buried) => Consumer::Buried,
             ErrorKind::Protocol(ProtocolError::NotIgnored) => Consumer::NotIgnored,
             _ => Consumer::Beanstalk {
                 error: error.into(),

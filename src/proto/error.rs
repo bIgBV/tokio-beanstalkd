@@ -96,7 +96,6 @@ pub(crate) enum ProtocolError {
     OutOfMemory,
     InternalError,
     UnknownCommand,
-    Buried,
     ExpectedCRLF,
     JobTooBig,
     Draining,
