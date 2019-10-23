@@ -344,7 +344,6 @@ impl Beanstalkd {
         match self.response().await {
             Ok(r) => match r {
                 AnyResponse::Watching(n) => Ok(n),
-                AnyResponse::NotIgnored => Err(errors::Consumer::NotIgnored),
                 _ => Err(Consumer::Beanstalk {
                     error: BeanstalkError::UnexpectedResponse,
                 }),

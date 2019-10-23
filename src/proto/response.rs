@@ -53,7 +53,6 @@ pub(crate) enum AnyResponse {
     Using(super::Tube),
     Deleted,
     Watching(u32),
-    NotIgnored,
     Released,
     Touched,
     Found(Job),
