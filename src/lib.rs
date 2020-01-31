@@ -441,26 +441,8 @@ pub enum PeekType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::process::Command;
-    use std::sync::atomic::{AtomicBool, Ordering};
-
-    static mut SPAWNED: AtomicBool = AtomicBool::new(false);
-
-    // Simple function to make sure only one instance of beanstalkd is spawned.
-    unsafe fn spawn_beanstalkd() {
-        if !*SPAWNED.get_mut() {
-            Command::new("beanstalkd")
-                .spawn()
-                .expect("Unable to spawn server");
-            SPAWNED.compare_and_swap(false, true, Ordering::SeqCst);
-        }
-    }
-
     #[tokio::test]
     async fn it_works() {
-        unsafe {
-            spawn_beanstalkd();
-        }
         let mut bean = Beanstalkd::connect(
             &"127.0.0.1:11300"
                 .parse()
@@ -480,9 +462,6 @@ mod tests {
 
     #[tokio::test]
     async fn consumer_commands() {
-        unsafe {
-            spawn_beanstalkd();
-        }
         let mut bean = Beanstalkd::connect(
             &"127.0.0.1:11300"
                 .parse()
