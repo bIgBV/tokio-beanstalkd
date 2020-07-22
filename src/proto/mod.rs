@@ -1,7 +1,7 @@
 use bytes::BytesMut;
 use failure;
 use failure::ResultExt;
-use tokio::codec::{Decoder, Encoder};
+use tokio_util::codec::{Decoder, Encoder};
 
 use std::io;
 use std::str;
@@ -19,7 +19,7 @@ use self::response::{Job, PreJob};
 
 /// A Tube is a way of separating different types of jobs in Beanstalkd.
 ///
-///  The clinet can use a particular tube by calling [`using`][using] and Beanstalkd will create a
+///  The client can use a particular tube by calling [`using`][using] and Beanstalkd will create a
 /// new tube if one does not already exist with that name. Workers can [`watch`][watch] particular
 /// tubes and receive jobs only from those tubes.
 ///
@@ -190,20 +190,19 @@ impl Decoder for CommandCodec {
     }
 }
 
-impl Encoder for CommandCodec {
-    type Item = Request;
+impl Encoder<Request> for CommandCodec {
     type Error = EncodeError;
 
-    fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        eprintln!("Making request: {:?}", item);
-        match item {
+    fn encode(&mut self, request: Request, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        eprintln!("Making request: {:?}", request);
+        match request {
             Request::Watch { tube } => {
                 if tube.as_bytes().len() > 200 {
                     return Err(EncodeError::TubeNameTooLong);
                 }
-                item.serialize(dst)
+                request.serialize(dst)
             }
-            _ => item.serialize(dst),
+            _ => request.serialize(dst),
         }
         Ok(())
     }

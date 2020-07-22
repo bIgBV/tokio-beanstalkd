@@ -79,8 +79,9 @@ extern crate failure;
 pub mod errors;
 mod proto;
 
-use tokio::codec::Framed;
-use tokio::prelude::*;
+use futures::SinkExt;
+use tokio::stream::StreamExt;
+use tokio_util::codec::Framed;
 
 use std::borrow::Cow;
 use std::net::SocketAddr;
@@ -441,6 +442,7 @@ pub enum PeekType {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[tokio::test]
     async fn it_works() {
         let mut bean = Beanstalkd::connect(
