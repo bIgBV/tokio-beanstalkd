@@ -20,7 +20,7 @@ application is responsible for interpreting the data.
 This library can serve as a client for both the application and the worker. The application would
 `put` jobs on the queue and the workers can `reserve` them. Once they are done with the job, they
 have to `delete` job. This is required for every job, or else Beanstalkd will not remove it from
-its internal datastructres.
+its internal data structures.
 
 
 If a worker cannot finish the job in it's TTR (Time To Run), then it can `release` the job. The
@@ -49,7 +49,6 @@ let bean = rt.block_on(
             }).and_then(|(bean, _)| bean.put(0, 1, 100, &b"notify:100"[..]))
     }),
 );
-# }
 ```
 
 And a worker could look something like this:
