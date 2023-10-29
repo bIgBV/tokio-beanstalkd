@@ -7,6 +7,9 @@ fast work queue.
 [![Crates.io](https://img.shields.io/crates/v/tokio-beanstalkd.svg)](https://crates.io/crates/tokio-beanstalkd)
 [![Documentation](https://docs.rs/tokio-beanstalkd/badge.svg)](https://docs.rs/tokio-beanstalkd/)
 
+This crate provides a client for working with [Beanstalkd](https://beanstalkd.github.io/), a simple
+fast work queue.
+
 # About Beanstalkd
 
 Beanstalkd is a simple fast work queue. It works at the TCP connection level, considering each TCP
@@ -18,14 +21,13 @@ application is responsible for interpreting the data.
 
 ## Operation
 This library can serve as a client for both the application and the worker. The application would
-`put` jobs on the queue and the workers can `reserve` them. Once they are done with the job, they
-have to `delete` job. This is required for every job, or else Beanstalkd will not remove it from
-its internal datastructres.
+[Beanstalkd::put] jobs on the queue and the workers can [Beanstalkd::reserve]
+them. Once they are done with the job, they have to [Beanstalkd::delete] job.
+This is required for every job, or else Beanstalkd will not remove it fromits internal datastructres.
 
-
-If a worker cannot finish the job in it's TTR (Time To Run), then it can `release` the job. The
-application can use the `using` method to put jobs in a specific tube, and workers can use `watch`
-to only reserve jobs from the specified tubes.
+If a worker cannot finish the job in it's TTR (Time To Run), then it can [Beanstalkd::release]
+the job. The application can use the [Beanstalkd::using] method to put jobs in a specific tube,
+and workers can use [Beanstalkd::watch]
 
 ## Interaction with Tokio
 
@@ -36,35 +38,41 @@ explicitly create a `tokio::Runtime` and then use `Runtime::block_on`.
 An simple example client could look something like this:
 
 ```rust
-let mut rt = tokio::runtime::Runtime::new().unwrap();
-let bean = rt.block_on(
-    Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()).and_then(|bean| {
-        bean.put(0, 1, 100, &b"update:42"[..])
-            .inspect(|(_, response)| {
-                response.as_ref().unwrap();
-            })
-            .and_then(|(bean, _)| {
-                // Use a particular tube
-                bean.using("notifications")
-            }).and_then(|(bean, _)| bean.put(0, 1, 100, &b"notify:100"[..]))
-    }),
-);
-# }
+# use tokio_beanstalkd::*;
+#[tokio::main]
+async fn main() {
+    let mut bean = Beanstalkd::connect(
+        &"127.0.0.1:11300"
+            .parse()
+            .expect("Unable to connect to Beanstalkd"),
+    )
+    .await
+    .unwrap();
+
+    bean.put(0, 1, 100, &b"update:42"[..]).await.unwrap();
+
+    // Use a particular tube
+    bean.using("notifications").await.unwrap();
+    bean.put(0, 1, 100, &b"notify:100"[..]).await.unwrap();
+}
 ```
 
 And a worker could look something like this:
 ```rust
- let mut rt = tokio::runtime::Runtime::new().unwrap();
- let bean = rt.block_on(
-     Beanstalkd::connect(&"127.0.0.1:11300".parse().unwrap()).and_then(|bean| {
-         bean.reserve()
-             .inspect(|(_, response)| {
-                 // Do something with the response
-             }).and_then(|(bean, response)| {
-                 // Delete the job once it is done
-                 bean.delete(response.as_ref().unwrap().id)
-             })
-     }),
- );
- rt.shutdown_on_idle();
+# use tokio_beanstalkd::*;
+#[tokio::main]
+async fn main() {
+    let mut bean = Beanstalkd::connect(
+        &"127.0.0.1:11300"
+            .parse()
+            .expect("Unable to connect to Beanstalkd"),
+    )
+    .await
+    .unwrap();
+
+    let response = bean.reserve().await.unwrap();
+    // ... do something with the response ...
+    // Delete the job once it is done
+    bean.delete(response.id).await.unwrap();
+}
 ```
