@@ -79,11 +79,12 @@ extern crate failure;
 pub mod errors;
 mod proto;
 
-use tokio::codec::Framed;
-use tokio::prelude::*;
-
 use std::borrow::Cow;
 use std::net::SocketAddr;
+
+use futures::SinkExt;
+use tokio_stream::StreamExt;
+use tokio_util::codec::Framed;
 
 pub use crate::proto::response::*;
 pub use crate::proto::{Id, Tube};

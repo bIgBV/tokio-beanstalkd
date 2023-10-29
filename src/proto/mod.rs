@@ -1,7 +1,8 @@
-use bytes::BytesMut;
 use failure;
 use failure::ResultExt;
-use tokio::codec::{Decoder, Encoder};
+use tokio_util::bytes::BytesMut;
+use tokio_util::codec::Decoder;
+use tokio_util::codec::Encoder;
 
 use std::io;
 use std::str;
@@ -190,11 +191,10 @@ impl Decoder for CommandCodec {
     }
 }
 
-impl Encoder for CommandCodec {
-    type Item = Request;
+impl Encoder<Request> for CommandCodec {
     type Error = EncodeError;
 
-    fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, item: Request, dst: &mut BytesMut) -> Result<(), Self::Error> {
         eprintln!("Making request: {:?}", item);
         match item {
             Request::Watch { tube } => {

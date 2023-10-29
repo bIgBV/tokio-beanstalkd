@@ -1,6 +1,7 @@
-use bytes::{BufMut, BytesMut};
 use std::borrow::Cow;
 use std::fmt;
+
+use tokio_util::bytes::{BufMut, BytesMut};
 
 /// A Request holds the data to be serialized on to the wire.
 #[derive(Debug)]
