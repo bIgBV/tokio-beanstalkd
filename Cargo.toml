@@ -17,10 +17,10 @@ license = "MIT"
 
 [dependencies]
 tokio = { version = "1", features = ["net"] }
-failure = "0.1"
 tokio-util = { version = "0.7.10", features = ["codec"] }
 tokio-stream = "0.1.14"
 futures = "0.3.29"
+thiserror = "1.0.50"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["net", "rt", "macros"] }

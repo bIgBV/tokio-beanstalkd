@@ -73,9 +73,6 @@
 
 #![warn(rust_2018_idioms)]
 
-#[macro_use]
-extern crate failure;
-
 pub mod errors;
 mod proto;
 
@@ -104,12 +101,14 @@ pub struct Beanstalkd {
     connection: Framed<tokio::net::TcpStream, proto::CommandCodec>,
 }
 
+pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
+
 // FIXME: log out unexpected errors using env_logger
 impl Beanstalkd {
     /// Connect to a Beanstalkd instance.
     ///
     /// A successful TCP connect is considered the start of communication.
-    pub async fn connect(addr: &SocketAddr) -> Result<Self, failure::Error> {
+    pub async fn connect(addr: &SocketAddr) -> Result<Self, Error> {
         let c = tokio::net::TcpStream::connect(addr).await?;
         Ok(Beanstalkd::setup(c))
     }
@@ -120,11 +119,11 @@ impl Beanstalkd {
     }
 
     async fn response(&mut self) -> Result<AnyResponse, proto::error::Decode> {
-        use proto::error::{ErrorKind, ProtocolError};
+        use proto::error::{Decode, ProtocolError};
 
         match self.connection.next().await {
             Some(r) => r,
-            None => Err(ErrorKind::Protocol(ProtocolError::StreamClosed).into()),
+            None => Err(Decode::Protocol(ProtocolError::StreamClosed).into()),
         }
     }
 
@@ -442,6 +441,7 @@ pub enum PeekType {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[tokio::test]
     async fn it_works() {
         let mut bean = Beanstalkd::connect(
