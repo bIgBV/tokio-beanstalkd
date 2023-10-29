@@ -12,16 +12,13 @@
 //!
 //! ## Operation
 //! This library can serve as a client for both the application and the worker. The application would
-//! [`put`](tokio_beanstalkd::put) jobs on the queue and the workers can [`reserve`](tokio_beanstalkd::put)
-//! them. Once they are done with the job, they have to [`delete`](tokio_beanstalkd::delete) job.
+//! [Beanstalkd::put] jobs on the queue and the workers can [Beanstalkd::reserve]
+//! them. Once they are done with the job, they have to [Beanstalkd::delete] job.
 //! This is required for every job, or else Beanstalkd will not remove it fromits internal datastructres.
 //!
-//! If a worker cannot finish the job in it's TTR (Time To Run), then it can [`release`](tokio_beanstalkd::release)
-//! the job. Theapplication can use the [`using`](tokio_beanstalkd::using) method to put jobs in a specific tube,
-//! and workers can use [watch](tokio_beanstalkd::watch)
-//!
-//! [release]: struct.Beanstalkd.html#method.release
-//! [using]: struct.Beanstalkd.html#method.using
+//! If a worker cannot finish the job in it's TTR (Time To Run), then it can [Beanstalkd::release]
+//! the job. The application can use the [Beanstalkd::using] method to put jobs in a specific tube,
+//! and workers can use [Beanstalkd::watch]
 //!
 //! ## Interaction with Tokio
 //!
@@ -143,7 +140,7 @@ impl Beanstalkd {
     ///   `ttr` seconds, the job will time out and the server will release the job.
     ///   The minimum ttr is 1. If the client sends 0, the server will silently
     ///   increase the ttr to 1.
-    /// - `data` is the job body -- a sequence of bytes of length <bytes> from the
+    /// - `data` is the job body -- a sequence of bytes of length \<bytes\> from the
     ///   previous line.
     ///
     /// After sending the command line and body, the client waits for a reply, which
@@ -174,7 +171,7 @@ impl Beanstalkd {
         }
     }
 
-    /// Reserve a [job](tokio_beanstalkd::response::Job) to process.
+    /// Reserve a [proto::response::Job] to process.
     ///
     /// FIXME: need to handle different responses returned at different TTR vs reserve-with-timeout times
     ///
@@ -313,7 +310,7 @@ impl Beanstalkd {
     /// watch list. For each new connection, the watch list initially consists of one
     /// tube, named "default".
     ///
-    ///  - <tube> is a name at most 200 bytes. It specifies a tube to add to the watch
+    ///  - \<tube\> is a name at most 200 bytes. It specifies a tube to add to the watch
     ///     list. If the tube doesn't exist, it will be created.
     ///
     /// The value returned is the count of the tubes being watched by the current connection.
@@ -332,7 +329,7 @@ impl Beanstalkd {
     /// The "ignore" command is for consumers. It removes the named tube from the
     /// watch list for the current connection.
     ///
-    ///  - <tube> is a name at most 200 bytes. It specifies a tube to add to the watch
+    ///  - \<tube\> is a name at most 200 bytes. It specifies a tube to add to the watch
     ///     list. If the tube doesn't exist, it will be created.
     ///
     /// A successful response is:
@@ -353,13 +350,13 @@ impl Beanstalkd {
     }
 
     /// The peek command lets the client inspect a job in the system. There are four
-    /// types of jobs as enumerated in [PeekType](tokio_beanstalkd::PeekType). All but the
+    /// types of jobs as enumerated in [PeekType]. All but the
     /// first operate only on the currently used tube.
     ///
-    /// * It takes a [PeekType](tokio_beanstalkd::PeekType) representing the type of peek
+    /// * It takes a [PeekType] representing the type of peek
     /// operation to perform
     ///
-    /// * And returns a [Job](tokio_beanstalkd::response::job) on success.
+    /// * And returns a [proto::response::Job] on success.
     pub async fn peek(&mut self, peek_type: PeekType) -> Result<Job, Consumer> {
         let request = match peek_type {
             PeekType::Ready => Request::PeekReady,
@@ -423,7 +420,7 @@ impl Beanstalkd {
     }
 }
 
-/// The type of [peek][tokio_beanstalkd::peek] request you want to make
+/// The type of [Beanstalkd::peek] request you want to make
 pub enum PeekType {
     /// The next ready job
     Ready,

@@ -19,7 +19,7 @@ pub enum BeanstalkError {
     OutOfMemory,
 
     /// This indicates a bug in the server. It should never happen. If it does happen, please report it
-    /// at http://groups.google.com/group/beanstalk-talk.
+    /// at <http://groups.google.com/group/beanstalk-talk>
     #[error("Internal server error")]
     InternalError,
     /// The client sent a command that the server does not know.
