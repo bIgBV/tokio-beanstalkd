@@ -120,7 +120,7 @@ impl Beanstalkd {
 
         match self.connection.next().await {
             Some(r) => r,
-            None => Err(Decode::Protocol(ProtocolError::StreamClosed).into()),
+            None => Err(Decode::Protocol(ProtocolError::StreamClosed)),
         }
     }
 

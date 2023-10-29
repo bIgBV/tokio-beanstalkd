@@ -5,6 +5,7 @@ use crate::proto::error::{Decode, EncodeError, ProtocolError};
 
 /// Errors that can be returned for any command
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Error)]
+#[non_exhaustive]
 pub enum BeanstalkError {
     /// The client sent a command line that was not well-formed. This can happen if the line does not
     /// end with \r\n, if non-numeric characters occur where an integer is expected, if the wrong
@@ -36,10 +37,6 @@ pub enum BeanstalkError {
 
     #[error("IO Error")]
     IoError,
-
-    #[doc(hidden)]
-    #[error("Just an extention..")]
-    __Nonexhaustive,
 }
 
 impl From<Decode> for BeanstalkError {
@@ -65,6 +62,7 @@ impl From<EncodeError> for BeanstalkError {
 
 /// Errors which can be casued due to a PUT command
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Error)]
+#[non_exhaustive]
 pub enum Put {
     /// The server ran out of memory trying to grow the priority queue data structure.
     /// The client should try another server or disconnect and try again later.
@@ -89,10 +87,6 @@ pub enum Put {
 
     #[error("A protocol error occurred: {}", error)]
     Beanstalk { error: BeanstalkError },
-
-    #[doc(hidden)]
-    #[error("Just an extention..")]
-    __Nonexhaustive,
 }
 
 impl From<Decode> for Put {
@@ -118,6 +112,7 @@ impl From<EncodeError> for Put {
 
 /// Errors which can occur when acting as a consumer/worker
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Error)]
+#[non_exhaustive]
 pub enum Consumer {
     /// If the job does not exist or is not either reserved by the client
     #[error("Did not find a job of that Id")]
@@ -131,10 +126,6 @@ pub enum Consumer {
 
     #[error("A protocol error occurred: {}", error)]
     Beanstalk { error: BeanstalkError },
-
-    #[doc(hidden)]
-    #[error("Just an extention..")]
-    __Nonexhaustive,
 }
 
 impl From<Decode> for Consumer {
