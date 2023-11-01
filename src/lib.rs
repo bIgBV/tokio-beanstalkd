@@ -61,10 +61,12 @@
 //!     .await
 //!     .unwrap();
 //!
-//!     let response = bean.reserve().await.unwrap();
+//!     let Response::Reserved(job) = bean.reserve().await.unwrap() else {
+//!         panic!("Error reserving job");
+//!     };
 //!     // ... do something with the response ...
 //!     // Delete the job once it is done
-//!     bean.delete(response.id).await.unwrap();
+//!     bean.delete(job.id).await.unwrap();
 //! }
 //! ```
 
@@ -200,8 +202,13 @@ impl Beanstalkd {
     /// buried.
     ///
     ///  - `id` is the job id to delete.
-    pub async fn delete(&mut self, id: u32) -> Result<Response, errors::Consumer> {
-        self.connection.send(Request::Delete { id }).await?;
+    pub async fn delete<T>(&mut self, id: T) -> Result<Response, errors::Consumer>
+    where
+        T: Into<Id>,
+    {
+        self.connection
+            .send(Request::Delete { id: id.into() })
+            .await?;
 
         self.response().await.map_err(Into::into)
     }
@@ -224,7 +231,7 @@ impl Beanstalkd {
     ) -> Result<Response, Consumer> {
         self.connection
             .send(Request::Release {
-                id,
+                id: id.into(),
                 priority,
                 delay,
             })
@@ -242,7 +249,9 @@ impl Beanstalkd {
     ///
     /// - `id` is the ID of a job reserved by the current connection.
     pub async fn touch(&mut self, id: u32) -> Result<Response, Consumer> {
-        self.connection.send(Request::Touch { id }).await?;
+        self.connection
+            .send(Request::Touch { id: id.into() })
+            .await?;
 
         self.response().await.map_err(Into::into)
     }
@@ -255,7 +264,12 @@ impl Beanstalkd {
     ///
     /// - `prioritiy` is a new priority to assign to the job.
     pub async fn bury(&mut self, id: u32, priority: u32) -> Result<Response, Consumer> {
-        self.connection.send(Request::Bury { id, priority }).await?;
+        self.connection
+            .send(Request::Bury {
+                id: id.into(),
+                priority,
+            })
+            .await?;
 
         self.response().await.map_err(Into::into)
     }
@@ -350,4 +364,32 @@ pub enum PeekType {
 
     /// The job with the given Id
     Normal(Id),
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use pretty_assertions::assert_eq;
+    use tracing_test::traced_test;
+
+    #[traced_test]
+    #[tokio::test]
+    async fn it_works() {
+        let mut bean = Beanstalkd::connect(
+            &"127.0.0.1:11300"
+                .parse()
+                .expect("Unable to connect to Beanstalkd"),
+        )
+        .await
+        .unwrap();
+
+        // Let put a job in
+        bean.put(0, 1, 100, &b"data"[..]).await.unwrap();
+        // how about another one?
+        bean.put(0, 1, 100, &b"more data"[..]).await.unwrap();
+        // Let's watch a particular tube
+        let response = bean.using("test").await.unwrap();
+
+        assert_eq!(response, Response::Using(String::from("test")));
+    }
 }

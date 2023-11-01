@@ -102,22 +102,22 @@ impl fmt::Display for Request {
             ),
             Request::Reserve => write!(f, "reserve\r\n"),
             Request::Use { tube } => write!(f, "use {}\r\n", tube),
-            Request::Delete { id } => write!(f, "delete {}\r\n", id),
+            Request::Delete { id } => write!(f, "delete {:?}\r\n", id),
             Request::Release {
                 id,
                 priority,
                 delay,
-            } => write!(f, "release {} {} {}\r\n", id, priority, delay),
-            Request::Bury { id, priority } => write!(f, "bury {} {}\r\n", id, priority),
-            Request::Touch { id } => write!(f, "touch {}\r\n", id),
+            } => write!(f, "release {:?} {} {}\r\n", id, priority, delay),
+            Request::Bury { id, priority } => write!(f, "bury {:?} {}\r\n", id, priority),
+            Request::Touch { id } => write!(f, "touch {:?}\r\n", id),
             Request::Watch { tube } => write!(f, "watch {}\r\n", tube),
             Request::Ignore { tube } => write!(f, "ignore {}\r\n", tube),
-            Request::Peek { id } => write!(f, "peek {}\r\n", id),
+            Request::Peek { id } => write!(f, "peek {:?}\r\n", id),
             Request::PeekReady => write!(f, "peek-ready\r\n"),
             Request::PeekDelay => write!(f, "peek-delayed\r\n"),
             Request::PeekBuried => write!(f, "peek-buried\r\n"),
             Request::Kick { bound } => write!(f, "kick {}\r\n", bound),
-            Request::KickJob { id } => write!(f, "kick-job {}\r\n", id),
+            Request::KickJob { id } => write!(f, "kick-job {:?}\r\n", id),
         }
     }
 }
