@@ -1,7 +1,7 @@
 //! The errors returned by the different operations in the library
 use thiserror::Error;
 
-use crate::proto::error::{Decode, EncodeError, ProtocolError};
+use crate::proto::error::{BeanError, EncodeError, ProtocolError};
 
 /// Errors that can be returned for any command
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Error)]
@@ -39,13 +39,13 @@ pub enum BeanstalkError {
     IoError,
 }
 
-impl From<Decode> for BeanstalkError {
-    fn from(error: Decode) -> Self {
+impl From<BeanError> for BeanstalkError {
+    fn from(error: BeanError) -> Self {
         match error {
-            Decode::Protocol(ProtocolError::BadFormat) => BeanstalkError::BadFormat,
-            Decode::Protocol(ProtocolError::OutOfMemory) => BeanstalkError::OutOfMemory,
-            Decode::Protocol(ProtocolError::InternalError) => BeanstalkError::InternalError,
-            Decode::Protocol(ProtocolError::UnknownCommand) => BeanstalkError::UnknownCommand,
+            BeanError::Protocol(ProtocolError::BadFormat) => BeanstalkError::BadFormat,
+            BeanError::Protocol(ProtocolError::OutOfMemory) => BeanstalkError::OutOfMemory,
+            BeanError::Protocol(ProtocolError::InternalError) => BeanstalkError::InternalError,
+            BeanError::Protocol(ProtocolError::UnknownCommand) => BeanstalkError::UnknownCommand,
             _ => BeanstalkError::UnexpectedResponse,
         }
     }
@@ -89,12 +89,12 @@ pub enum Put {
     Beanstalk { error: BeanstalkError },
 }
 
-impl From<Decode> for Put {
-    fn from(error: Decode) -> Self {
+impl From<BeanError> for Put {
+    fn from(error: BeanError) -> Self {
         match error {
-            Decode::Protocol(ProtocolError::ExpectedCRLF) => Put::ExpectedCRLF,
-            Decode::Protocol(ProtocolError::JobTooBig) => Put::JobTooBig,
-            Decode::Protocol(ProtocolError::Draining) => Put::Draining,
+            BeanError::Protocol(ProtocolError::ExpectedCRLF) => Put::ExpectedCRLF,
+            BeanError::Protocol(ProtocolError::JobTooBig) => Put::JobTooBig,
+            BeanError::Protocol(ProtocolError::Draining) => Put::Draining,
             _ => Put::Beanstalk {
                 error: error.into(),
             },
@@ -128,11 +128,10 @@ pub enum Consumer {
     Beanstalk { error: BeanstalkError },
 }
 
-impl From<Decode> for Consumer {
-    fn from(error: Decode) -> Self {
+impl From<BeanError> for Consumer {
+    fn from(error: BeanError) -> Self {
         match error {
-            Decode::Protocol(ProtocolError::NotFound) => Consumer::NotFound,
-            Decode::Protocol(ProtocolError::NotIgnored) => Consumer::NotIgnored,
+            BeanError::Protocol(ProtocolError::NotIgnored) => Consumer::NotIgnored,
             _ => Consumer::Beanstalk {
                 error: error.into(),
             },

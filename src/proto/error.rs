@@ -6,7 +6,7 @@ use thiserror::Error;
 
 /// Enum that helps understand what kind of a decoder error occurred.
 #[derive(Debug, Error)]
-pub(crate) enum Decode {
+pub(crate) enum BeanError {
     #[error("A protocol error occurred")]
     Protocol(#[from] ProtocolError),
     #[error("A parsing error occurred")]
@@ -54,8 +54,6 @@ pub(crate) enum ProtocolError {
     JobTooBig,
     #[error("Draining")]
     Draining,
-    #[error("NotFound")]
-    NotFound,
     #[error("NotIgnored")]
     NotIgnored,
     #[error("StreamClosed")]

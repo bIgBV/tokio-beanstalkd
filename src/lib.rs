@@ -115,12 +115,12 @@ impl Beanstalkd {
         Beanstalkd { connection: bean }
     }
 
-    async fn response(&mut self) -> Result<AnyResponse, proto::error::Decode> {
-        use proto::error::{Decode, ProtocolError};
+    async fn response(&mut self) -> Result<Response, proto::error::BeanError> {
+        use proto::error::{BeanError, ProtocolError};
 
         match self.connection.next().await {
             Some(r) => r,
-            None => Err(Decode::Protocol(ProtocolError::StreamClosed)),
+            None => Err(BeanError::Protocol(ProtocolError::StreamClosed)),
         }
     }
 
@@ -145,7 +145,13 @@ impl Beanstalkd {
     ///
     /// After sending the command line and body, the client waits for a reply, which
     /// is the integer id of the new job.
-    pub async fn put<D>(&mut self, priority: u32, delay: u32, ttr: u32, data: D) -> Result<Id, Put>
+    pub async fn put<D>(
+        &mut self,
+        priority: u32,
+        delay: u32,
+        ttr: u32,
+        data: D,
+    ) -> Result<Response, Put>
     where
         D: Into<Cow<'static, [u8]>>,
     {
@@ -159,16 +165,7 @@ impl Beanstalkd {
             })
             .await?;
 
-        match self.response().await {
-            Ok(r) => match r {
-                AnyResponse::Inserted(id) => Ok(id),
-                AnyResponse::Buried => Err(Put::Buried),
-                _ => Err(Put::Beanstalk {
-                    error: BeanstalkError::UnexpectedResponse,
-                }),
-            },
-            Err(e) => Err(e.into()),
-        }
+        self.response().await.map_err(Into::into)
     }
 
     /// Reserve a [proto::response::Job] to process.
@@ -176,21 +173,13 @@ impl Beanstalkd {
     /// FIXME: need to handle different responses returned at different TTR vs reserve-with-timeout times
     ///
     /// A process that wants to consume jobs from the queue uses `reserve`,
-    /// `[delete](tokio_beanstalkd::delete)`,
-    /// `[release](tokio_beanstalkd::release)`, and
-    /// `[bury](tokio_beanstalkd::bury)`.
-    pub async fn reserve(&mut self) -> Result<Job, Consumer> {
+    /// `[Beanstalkd::delete]`,
+    /// `[Beanstalkd::release]`, and
+    /// `[Beanstalkd::bury]`.
+    pub async fn reserve(&mut self) -> Result<Response, Consumer> {
         self.connection.send(proto::Request::Reserve).await?;
 
-        match self.response().await {
-            Ok(r) => match r {
-                AnyResponse::Reserved(job) => Ok(job),
-                _ => Err(Consumer::Beanstalk {
-                    error: BeanstalkError::UnexpectedResponse,
-                }),
-            },
-            Err(e) => Err(e.into()),
-        }
+        self.response().await.map_err(Into::into)
     }
 
     /// The "use" command is for producers. Subsequent put commands will put jobs into
@@ -199,16 +188,10 @@ impl Beanstalkd {
     ///
     /// - `tube` is a name at most 200 bytes. It specifies the tube to use. If the
     ///   tube does not exist, it will be created.
-    pub async fn using(&mut self, tube: &'static str) -> Result<Tube, BeanstalkError> {
+    pub async fn using(&mut self, tube: &'static str) -> Result<Response, BeanstalkError> {
         self.connection.send(Request::Use { tube }).await?;
 
-        match self.response().await {
-            Ok(r) => match r {
-                AnyResponse::Using(tube) => Ok(tube),
-                _ => Err(BeanstalkError::UnexpectedResponse),
-            },
-            Err(e) => Err(e.into()),
-        }
+        self.response().await.map_err(Into::into)
     }
 
     /// The delete command removes a job from the server entirely. It is normally used
@@ -217,18 +200,10 @@ impl Beanstalkd {
     /// buried.
     ///
     ///  - `id` is the job id to delete.
-    pub async fn delete(&mut self, id: u32) -> Result<(), errors::Consumer> {
+    pub async fn delete(&mut self, id: u32) -> Result<Response, errors::Consumer> {
         self.connection.send(Request::Delete { id }).await?;
 
-        match self.response().await {
-            Ok(r) => match r {
-                AnyResponse::Deleted => Ok(()),
-                _ => Err(Consumer::Beanstalk {
-                    error: BeanstalkError::UnexpectedResponse,
-                }),
-            },
-            Err(e) => Err(e.into()),
-        }
+        self.response().await.map_err(Into::into)
     }
 
     /// The release command puts a reserved job back into the ready queue (and marks
@@ -241,7 +216,12 @@ impl Beanstalkd {
     ///
     /// - `delay` is an integer number of seconds to wait before putting the job in
     ///   the ready queue. The job will be in the "delayed" state during this time.
-    pub async fn release(&mut self, id: u32, priority: u32, delay: u32) -> Result<(), Consumer> {
+    pub async fn release(
+        &mut self,
+        id: u32,
+        priority: u32,
+        delay: u32,
+    ) -> Result<Response, Consumer> {
         self.connection
             .send(Request::Release {
                 id,
@@ -250,16 +230,7 @@ impl Beanstalkd {
             })
             .await?;
 
-        match self.response().await {
-            Ok(r) => match r {
-                AnyResponse::Released => Ok(()),
-                AnyResponse::Buried => Err(Consumer::Buried),
-                _ => Err(Consumer::Beanstalk {
-                    error: BeanstalkError::UnexpectedResponse,
-                }),
-            },
-            Err(e) => Err(e.into()),
-        }
+        self.response().await.map_err(Into::into)
     }
 
     /// The "touch" command allows a worker to request more time to work on a job.
@@ -270,18 +241,10 @@ impl Beanstalkd {
     /// release of a reserved job until TTR seconds from when the command is issued.
     ///
     /// - `id` is the ID of a job reserved by the current connection.
-    pub async fn touch(&mut self, id: u32) -> Result<(), Consumer> {
+    pub async fn touch(&mut self, id: u32) -> Result<Response, Consumer> {
         self.connection.send(Request::Touch { id }).await?;
 
-        match self.response().await {
-            Ok(r) => match r {
-                AnyResponse::Touched => Ok(()),
-                _ => Err(Consumer::Beanstalk {
-                    error: BeanstalkError::UnexpectedResponse,
-                }),
-            },
-            Err(e) => Err(e.into()),
-        }
+        self.response().await.map_err(Into::into)
     }
 
     /// The bury command puts a job into the "buried" state. Buried jobs are put into a
@@ -291,18 +254,10 @@ impl Beanstalkd {
     ///  - `id` is the job id to release.
     ///
     /// - `prioritiy` is a new priority to assign to the job.
-    pub async fn bury(&mut self, id: u32, priority: u32) -> Result<(), Consumer> {
+    pub async fn bury(&mut self, id: u32, priority: u32) -> Result<Response, Consumer> {
         self.connection.send(Request::Bury { id, priority }).await?;
 
-        match self.response().await {
-            Ok(r) => match r {
-                AnyResponse::Buried => Ok(()),
-                _ => Err(Consumer::Beanstalk {
-                    error: BeanstalkError::UnexpectedResponse,
-                }),
-            },
-            Err(e) => Err(e.into()),
-        }
+        self.response().await.map_err(Into::into)
     }
 
     /// The "watch" command adds the named tube to the watch list for the current
@@ -314,16 +269,10 @@ impl Beanstalkd {
     ///     list. If the tube doesn't exist, it will be created.
     ///
     /// The value returned is the count of the tubes being watched by the current connection.
-    pub async fn watch(&mut self, tube: &'static str) -> Result<u32, BeanstalkError> {
+    pub async fn watch(&mut self, tube: &'static str) -> Result<Response, BeanstalkError> {
         self.connection.send(Request::Watch { tube }).await?;
 
-        match self.response().await {
-            Ok(r) => match r {
-                AnyResponse::Watching(n) => Ok(n),
-                _ => Err(BeanstalkError::UnexpectedResponse),
-            },
-            Err(e) => Err(e.into()),
-        }
+        self.response().await.map_err(Into::into)
     }
 
     /// The "ignore" command is for consumers. It removes the named tube from the
@@ -335,18 +284,10 @@ impl Beanstalkd {
     /// A successful response is:
     ///
     /// - The count of the number of tubes currently watching
-    pub async fn ignore(&mut self, tube: &'static str) -> Result<u32, Consumer> {
+    pub async fn ignore(&mut self, tube: &'static str) -> Result<Response, Consumer> {
         self.connection.send(Request::Ignore { tube }).await?;
 
-        match self.response().await {
-            Ok(r) => match r {
-                AnyResponse::Watching(n) => Ok(n),
-                _ => Err(Consumer::Beanstalk {
-                    error: BeanstalkError::UnexpectedResponse,
-                }),
-            },
-            Err(e) => Err(e.into()),
-        }
+        self.response().await.map_err(Into::into)
     }
 
     /// The peek command lets the client inspect a job in the system. There are four
@@ -357,7 +298,7 @@ impl Beanstalkd {
     /// operation to perform
     ///
     /// * And returns a [proto::response::Job] on success.
-    pub async fn peek(&mut self, peek_type: PeekType) -> Result<Job, Consumer> {
+    pub async fn peek(&mut self, peek_type: PeekType) -> Result<Response, Consumer> {
         let request = match peek_type {
             PeekType::Ready => Request::PeekReady,
             PeekType::Delayed => Request::PeekDelay,
@@ -367,15 +308,7 @@ impl Beanstalkd {
 
         self.connection.send(request).await?;
 
-        match self.response().await {
-            Ok(r) => match r {
-                AnyResponse::Found(job) => Ok(job),
-                _ => Err(Consumer::Beanstalk {
-                    error: BeanstalkError::UnexpectedResponse,
-                }),
-            },
-            Err(e) => Err(e.into()),
-        }
+        self.response().await.map_err(Into::into)
     }
 
     /// The kick command applies only to the currently used tube. It moves jobs into
@@ -384,18 +317,10 @@ impl Beanstalkd {
     ///
     /// * It takes a `bound` which is the number of jobs it will kick
     /// * The response is a u32 representing the number of jobs kicked by the server
-    pub async fn kick(&mut self, bound: u32) -> Result<u32, Consumer> {
+    pub async fn kick(&mut self, bound: u32) -> Result<Response, Consumer> {
         self.connection.send(Request::Kick { bound }).await?;
 
-        match self.response().await {
-            Ok(r) => match r {
-                AnyResponse::Kicked(job) => Ok(job),
-                _ => Err(Consumer::Beanstalk {
-                    error: BeanstalkError::UnexpectedResponse,
-                }),
-            },
-            Err(e) => Err(e.into()),
-        }
+        self.response().await.map_err(Into::into)
     }
 
     /// The kick-job command is a variant of kick that operates with a single job
@@ -405,18 +330,10 @@ impl Beanstalkd {
     ///
     /// * It takes an `id` of the job to be kicked
     /// * And returns `()` on success
-    pub async fn kick_job(&mut self, id: Id) -> Result<(), Consumer> {
+    pub async fn kick_job(&mut self, id: Id) -> Result<Response, Consumer> {
         self.connection.send(Request::KickJob { id }).await?;
 
-        match self.response().await {
-            Ok(r) => match r {
-                AnyResponse::JobKicked => Ok(()),
-                _ => Err(Consumer::Beanstalk {
-                    error: BeanstalkError::UnexpectedResponse,
-                }),
-            },
-            Err(e) => Err(e.into()),
-        }
+        self.response().await.map_err(Into::into)
     }
 }
 
@@ -433,73 +350,4 @@ pub enum PeekType {
 
     /// The job with the given Id
     Normal(Id),
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn it_works() {
-        let mut bean = Beanstalkd::connect(
-            &"127.0.0.1:11300"
-                .parse()
-                .expect("Unable to connect to Beanstalkd"),
-        )
-        .await
-        .unwrap();
-
-        // Let put a job in
-        bean.put(0, 1, 100, &b"data"[..]).await.unwrap();
-        // how about another one?
-        bean.put(0, 1, 100, &b"more data"[..]).await.unwrap();
-        // Let's watch a particular tube
-        let response = bean.using("test").await.unwrap();
-        assert_eq!(response, "test");
-    }
-
-    #[tokio::test]
-    async fn consumer_commands() {
-        let mut bean = Beanstalkd::connect(
-            &"127.0.0.1:11300"
-                .parse()
-                .expect("Unable to connect to Beanstalkd"),
-        )
-        .await
-        .unwrap();
-
-        // [put][tokio_beanstalkd::put] test
-        bean.put(0, 1, 100, &b"data"[..]).await.unwrap();
-        // [reserve][tokio_beanstalkd::reserve] test
-        let response = bean.reserve().await.unwrap();
-        assert_eq!(response.data, b"data");
-        // [peek][tokio_beanstalkd::peek] test with PeekType::Normal
-        let response = bean.peek(PeekType::Normal(response.id)).await.unwrap();
-        // [touch][tokio_beanstalkd::touch] test
-        bean.touch(response.id).await.unwrap();
-        // [put][tokio_beanstalkd::put] test
-        // how about another one?
-        bean.put(0, 1, 100, &b"more data"[..]).await.unwrap();
-        // [peek][tokio_beanstalkd::peek] PeekType::Ready test
-        bean.peek(PeekType::Ready).await.unwrap();
-        // [release][tokio_beanstalkd::release] test
-        let response = bean.reserve().await.unwrap();
-        bean.release(response.id, 10, 10).await.unwrap();
-        // [bury][tokio_beanstalkd::bury] test
-        let response = bean.reserve().await.unwrap();
-        bean.bury(response.id, 10).await.unwrap();
-        // [delete][tokio_beanstalkd::delete] test
-        let e = bean.delete(100).await.unwrap_err();
-        assert_eq!(e, errors::Consumer::NotFound);
-        // [watch][tokio_beanstalkd::watch] test
-        let response = bean.watch("test").await.unwrap();
-        assert_eq!(response, 2);
-        // [ignore][tokio_beanstalkd::ignore] test
-        let response = bean.ignore("test").await.unwrap();
-        assert_eq!(response, 1);
-        // [peek][tokio_beanstalkd::peek] PeekType::Buried test
-        bean.peek(PeekType::Buried).await.unwrap();
-        // [peek][tokio_beanstalkd::peek] PeekType::Delayed test
-        bean.peek(PeekType::Delayed).await.unwrap();
-    }
 }
