@@ -1,6 +1,9 @@
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::Decoder;
 use tokio_util::codec::Encoder;
+use tracing::debug;
+use tracing::instrument;
+use tracing::trace;
 
 use std::io;
 use std::str;
@@ -13,7 +16,7 @@ pub(crate) mod response;
 pub(crate) use self::request::Request;
 pub use self::response::*;
 
-use self::error::{Decode, EncodeError, ParsingError, ProtocolError};
+use self::error::{BeanError, EncodeError, ParsingError, ProtocolError};
 use self::response::{Job, PreJob};
 
 /// A Tube is a way of separating different types of jobs in Beanstalkd.
@@ -41,51 +44,65 @@ impl CommandCodec {
     }
 
     /// Helper method which handles all single word responses
-    fn single_word_response(&self, list: &[&str]) -> Result<AnyResponse, Decode> {
-        match list[0] {
-            "OUT_OF_MEMORY" => Err(Decode::Protocol(ProtocolError::OutOfMemory))?,
-            "INTERNAL_ERROR" => Err(Decode::Protocol(ProtocolError::InternalError))?,
-            "BAD_FORMAT" => Err(Decode::Protocol(ProtocolError::BadFormat))?,
-            "UNKNOWN_COMMAND" => Err(Decode::Protocol(ProtocolError::UnknownCommand))?,
-            "EXPECTED_CRLF" => Err(Decode::Protocol(ProtocolError::ExpectedCRLF))?,
-            "JOB_TOO_BIG" => Err(Decode::Protocol(ProtocolError::JobTooBig))?,
-            "DRAINING" => Err(Decode::Protocol(ProtocolError::Draining))?,
-            "NOT_FOUND" => Err(Decode::Protocol(ProtocolError::NotFound))?,
-            "NOT_IGNORED" => Err(Decode::Protocol(ProtocolError::NotIgnored))?,
-            "BURIED" => Ok(AnyResponse::Buried),
-            "TOUCHED" => Ok(AnyResponse::Touched),
-            "RELEASED" => Ok(AnyResponse::Released),
-            "DELETED" => Ok(AnyResponse::Deleted),
-            "KICKED" => Ok(AnyResponse::JobKicked),
-            _ => Err(Decode::Parsing(ParsingError::UnknownResponse))?,
-        }
+    #[instrument]
+    fn single_word_response(&self, list: &[&str]) -> Result<Response, BeanError> {
+        let result = match list[0] {
+            "OUT_OF_MEMORY" => Err(BeanError::Protocol(ProtocolError::OutOfMemory))?,
+            "INTERNAL_ERROR" => Err(BeanError::Protocol(ProtocolError::InternalError))?,
+            "BAD_FORMAT" => Err(BeanError::Protocol(ProtocolError::BadFormat))?,
+            "UNKNOWN_COMMAND" => Err(BeanError::Protocol(ProtocolError::UnknownCommand))?,
+            "EXPECTED_CRLF" => Err(BeanError::Protocol(ProtocolError::ExpectedCRLF))?,
+            "JOB_TOO_BIG" => Err(BeanError::Protocol(ProtocolError::JobTooBig))?,
+            "DRAINING" => Err(BeanError::Protocol(ProtocolError::Draining))?,
+            "NOT_IGNORED" => Err(BeanError::Protocol(ProtocolError::NotIgnored))?,
+            "NOT_FOUND" => Ok(Response::NotFound),
+            "BURIED" => Ok(Response::Buried(None)),
+            "TOUCHED" => Ok(Response::Touched),
+            "RELEASED" => Ok(Response::Released),
+            "DELETED" => Ok(Response::Deleted),
+            "KICKED" => Ok(Response::JobKicked),
+            _ => Err(BeanError::Parsing(ParsingError::UnknownResponse))?,
+        };
+
+        trace!(?result, "processed single word response");
+        result
     }
 
     /// Helper method which handles all two word responses
-    fn two_word_response(&self, list: &[&str]) -> Result<AnyResponse, Decode> {
-        match list[0] {
+    #[instrument]
+    fn two_word_response(&self, list: &[&str]) -> Result<Response, BeanError> {
+        let result = match list[0] {
             "INSERTED" => {
-                let id: u32 =
-                    u32::from_str(list[1]).map_err(|_| Decode::Parsing(ParsingError::ParseId))?;
-                Ok(AnyResponse::Inserted(id))
+                let id: u32 = u32::from_str(list[1])
+                    .map_err(|_| BeanError::Parsing(ParsingError::ParseId))?;
+                Ok(Response::Inserted(id))
+            }
+            "BURIED" => {
+                let id: u32 = u32::from_str(list[1])
+                    .map_err(|_| BeanError::Parsing(ParsingError::ParseId))?;
+                Ok(Response::Buried(Some(id)))
             }
             "WATCHING" => {
-                let count =
-                    u32::from_str(list[1]).map_err(|_| Decode::Parsing(ParsingError::ParseId))?;
-                Ok(AnyResponse::Watching(count))
+                let count = u32::from_str(list[1])
+                    .map_err(|_| BeanError::Parsing(ParsingError::ParseId))?;
+                Ok(Response::Watching(count))
             }
-            "USING" => Ok(AnyResponse::Using(String::from(list[1]))),
+            "USING" => Ok(Response::Using(String::from(list[1]))),
             "KICKED" => {
                 let count: u32 = u32::from_str(list[1])
-                    .map_err(|_| Decode::Parsing(ParsingError::ParseNumber))?;
-                Ok(AnyResponse::Kicked(count))
+                    .map_err(|_| BeanError::Parsing(ParsingError::ParseNumber))?;
+                Ok(Response::Kicked(count))
             }
-            _ => Err(Decode::Parsing(ParsingError::UnknownResponse))?,
-        }
+            _ => Err(BeanError::Parsing(ParsingError::UnknownResponse))?,
+        };
+
+        trace!(?result, "Parsed two word response");
+        result
     }
 
-    fn parse_response(&self, list: &[&str]) -> Result<AnyResponse, Decode> {
-        eprintln!("Parsing: {:?}", list);
+    #[instrument]
+    fn parse_response(&self, list: &[&str]) -> Result<Response, BeanError> {
+        debug!("Parsing response");
         if list.len() == 1 {
             return self.single_word_response(list);
         }
@@ -97,43 +114,49 @@ impl CommandCodec {
 
         if list.len() == 3 {
             return match list[0] {
-                "RESERVED" => Ok(AnyResponse::Pre(parse_pre_job(
+                "RESERVED" => Ok(Response::Pre(parse_pre_job(
                     &list[1..],
                     response::PreResponse::Reserved,
                 )?)),
-                "FOUND" => Ok(AnyResponse::Pre(parse_pre_job(
+                "FOUND" => Ok(Response::Pre(parse_pre_job(
                     &list[1..],
                     response::PreResponse::Peek,
                 )?)),
-                _ => Err(Decode::Parsing(ParsingError::UnknownResponse))?,
+                _ => Err(BeanError::Parsing(ParsingError::UnknownResponse))?,
             };
         }
 
-        Err(Decode::Parsing(ParsingError::UnknownResponse))?
+        Err(BeanError::Parsing(ParsingError::UnknownResponse))?
     }
 
-    fn parse_job(&mut self, src: &mut BytesMut, pre: &PreJob) -> Result<Option<Job>, Decode> {
+    #[instrument(skip_all)]
+    fn parse_job(&mut self, src: &mut BytesMut, pre: &PreJob) -> Result<Option<Job>, BeanError> {
         if let Some(carriage_offset) = src.iter().position(|b| *b == b'\r') {
             if src[carriage_offset + 1] == b'\n' {
-                let line = utf8(src).map_err(|_| Decode::Parsing(ParsingError::ParseString))?;
+                let line = utf8(src).map_err(|_| BeanError::Parsing(ParsingError::ParseString))?;
                 let line: Vec<&str> = line.trim().split(' ').collect();
-                return Ok(Some(Job {
+
+                let job = Job {
                     id: pre.id,
                     bytes: pre.bytes,
                     data: line[0].as_bytes().to_vec(),
-                }));
+                };
+
+                trace!(?job);
+                return Ok(Some(job));
             }
         }
         self.outstart += src.len();
         Ok(None)
     }
 
+    #[instrument(skip(src))]
     fn handle_job_response(
         &mut self,
-        response: AnyResponse,
+        response: Response,
         src: &mut BytesMut,
-    ) -> Result<Option<AnyResponse>, Decode> {
-        if let AnyResponse::Pre(pre) = response {
+    ) -> Result<Option<Response>, BeanError> {
+        if let Response::Pre(pre) = response {
             if let Some(job) = self.parse_job(src, &pre)? {
                 self.outstart = 0;
                 src.clear();
@@ -149,9 +172,9 @@ impl CommandCodec {
     }
 }
 
-fn parse_pre_job(list: &[&str], response_type: response::PreResponse) -> Result<PreJob, Decode> {
-    let id = u32::from_str(list[0]).map_err(|_| Decode::Parsing(ParsingError::ParseId))?;
-    let bytes = usize::from_str(list[1]).map_err(|_| Decode::Parsing(ParsingError::ParseId))?;
+fn parse_pre_job(list: &[&str], response_type: response::PreResponse) -> Result<PreJob, BeanError> {
+    let id = u32::from_str(list[0]).map_err(|_| BeanError::Parsing(ParsingError::ParseId))?;
+    let bytes = usize::from_str(list[1]).map_err(|_| BeanError::Parsing(ParsingError::ParseId))?;
     Ok(PreJob {
         id,
         bytes,
@@ -160,23 +183,24 @@ fn parse_pre_job(list: &[&str], response_type: response::PreResponse) -> Result<
 }
 
 impl Decoder for CommandCodec {
-    type Item = AnyResponse;
-    type Error = Decode;
+    type Item = Response;
+    type Error = BeanError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        eprintln!("Decoding: {:?}", src);
+        trace!(source = ?src , "Decoding");
         if let Some(carriage_offset) = src[self.outstart..].iter().position(|b| *b == b'\r') {
             if src[carriage_offset + 1] == b'\n' {
                 // Afterwards src contains elements [at, len), and the returned BytesMut
                 // contains elements [0, at), so + 1 for \r and then +1 for \n
                 let offset = self.outstart + carriage_offset + 1 + 1;
                 let line = src.split_to(offset);
-                let line = utf8(&line).map_err(|_| Decode::Parsing(ParsingError::ParseString))?;
+                let line =
+                    utf8(&line).map_err(|_| BeanError::Parsing(ParsingError::ParseString))?;
                 let line: Vec<&str> = line.trim().split(' ').collect();
 
                 let response = self.parse_response(&line[..])?;
+                debug!(?response, "Got response");
 
-                eprintln!("Got response: {:?}", response);
                 // Since the actual job data is on a second line, we need additional parsing
                 // extract it from the buffer.
                 return self.handle_job_response(response, src);
@@ -192,8 +216,9 @@ impl Decoder for CommandCodec {
 impl Encoder<Request> for CommandCodec {
     type Error = EncodeError;
 
+    #[instrument(skip_all)]
     fn encode(&mut self, item: Request, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        eprintln!("Making request: {:?}", item);
+        trace!(?item, "Making request");
         match item {
             Request::Watch { tube } => {
                 if tube.as_bytes().len() > 200 {
