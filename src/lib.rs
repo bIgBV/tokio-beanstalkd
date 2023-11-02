@@ -384,9 +384,23 @@ mod test {
         .unwrap();
 
         // Let put a job in
-        bean.put(0, 1, 100, &b"data"[..]).await.unwrap();
+        let data = &b"data"[..];
+        let Response::Inserted(id1) = bean.put(0, 1, 100, data).await.unwrap() else {
+            panic!("Unexpected response for put");
+        };
+
         // how about another one?
         bean.put(0, 1, 100, &b"more data"[..]).await.unwrap();
+
+        let job = bean.reserve().await.unwrap();
+
+        let Response::Reserved(job) = job else {
+            panic!("Unexpected response");
+        };
+
+        assert_eq!(job.id, id1);
+        assert_eq!(&job.data, data);
+
         // Let's watch a particular tube
         let response = bean.using("test").await.unwrap();
 
