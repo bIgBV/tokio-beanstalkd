@@ -30,7 +30,14 @@ use self::response::{Job, PreJob};
 pub type Tube = String;
 
 /// The ID of a job assigned by Beanstalkd
-pub type Id = u32;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Id(u32);
+
+impl From<u32> for Id {
+    fn from(value: u32) -> Self {
+        Self(value)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct CommandCodec {
@@ -75,12 +82,12 @@ impl CommandCodec {
             "INSERTED" => {
                 let id: u32 = u32::from_str(list[1])
                     .map_err(|_| BeanError::Parsing(ParsingError::ParseId))?;
-                Ok(Response::Inserted(id))
+                Ok(Response::Inserted(id.into()))
             }
             "BURIED" => {
                 let id: u32 = u32::from_str(list[1])
                     .map_err(|_| BeanError::Parsing(ParsingError::ParseId))?;
-                Ok(Response::Buried(Some(id)))
+                Ok(Response::Buried(Some(id.into())))
             }
             "WATCHING" => {
                 let count = u32::from_str(list[1])
@@ -176,7 +183,7 @@ fn parse_pre_job(list: &[&str], response_type: response::PreResponse) -> Result<
     let id = u32::from_str(list[0]).map_err(|_| BeanError::Parsing(ParsingError::ParseId))?;
     let bytes = usize::from_str(list[1]).map_err(|_| BeanError::Parsing(ParsingError::ParseId))?;
     Ok(PreJob {
-        id,
+        id: id.into(),
         bytes,
         response_type,
     })
