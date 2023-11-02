@@ -28,7 +28,7 @@ jobs:
     - name: Run tests
       run: cargo test --verbose
   clippy:
-    runs-on: ubunty-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - run: rustup component add clippy
