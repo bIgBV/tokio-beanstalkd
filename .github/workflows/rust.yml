@@ -15,6 +15,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Install beanstalkd
+      run: |
+        sudo apt-get update
+        sudo apt-get install beanstalkd
+    - name: Start beanstalkd
+      run: |
+        beanstalkd &
     - uses: actions/checkout@v3
     - name: Build
       run: cargo build --verbose
