@@ -76,9 +76,9 @@ pub mod errors;
 mod proto;
 
 use std::borrow::Cow;
-use std::net::SocketAddr;
 
 use futures::SinkExt;
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 
@@ -96,25 +96,20 @@ use crate::errors::{BeanstalkError, Consumer, Put};
 /// Even though there is a `quit` command, Beanstalkd consideres a closed connection as the
 /// end of communication, so just dropping this struct will close the connection.
 #[derive(Debug)]
-pub struct Beanstalkd {
-    connection: Framed<tokio::net::TcpStream, proto::CommandCodec>,
+pub struct Beanstalkd<S>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+{
+    connection: Framed<S, proto::CommandCodec>,
 }
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 // FIXME: log out unexpected errors using env_logger
-impl Beanstalkd {
-    /// Connect to a Beanstalkd instance.
-    ///
-    /// A successful TCP connect is considered the start of communication.
-    pub async fn connect(addr: &SocketAddr) -> Result<Self, Error> {
-        let c = tokio::net::TcpStream::connect(addr).await?;
-        Ok(Beanstalkd::setup(c))
-    }
-
-    fn setup(stream: tokio::net::TcpStream) -> Self {
+impl<'a, S: AsyncRead + AsyncWrite + Unpin> Beanstalkd<S> {
+    async fn setup(stream: S) -> Result<Self, std::io::Error> {
         let bean = Framed::new(stream, proto::CommandCodec::new());
-        Beanstalkd { connection: bean }
+        Ok(Beanstalkd { connection: bean })
     }
 
     async fn response(&mut self) -> Result<Response, proto::error::BeanError> {
@@ -372,16 +367,11 @@ mod test {
     use pretty_assertions::assert_eq;
     use tracing_test::traced_test;
 
-    #[traced_test]
-    #[tokio::test]
-    async fn it_works() {
-        let mut bean = Beanstalkd::connect(
-            &"127.0.0.1:11300"
-                .parse()
-                .expect("Unable to connect to Beanstalkd"),
-        )
-        .await
-        .unwrap();
+    async fn it_works<S>(stream: S)
+    where
+        S: AsyncRead + AsyncWrite + Unpin,
+    {
+        let mut bean = Beanstalkd::setup(stream).await.unwrap();
 
         // Let put a job in
         let data = &b"data"[..];
@@ -405,5 +395,24 @@ mod test {
         let response = bean.using("test").await.unwrap();
 
         assert_eq!(response, Response::Using(String::from("test")));
+    }
+
+    #[traced_test]
+    #[tokio::test]
+    async fn it_works_tcp() {
+        let stream = tokio::net::TcpStream::connect("127.0.0.1:11300")
+            .await
+            .unwrap();
+        it_works(stream).await;
+    }
+
+    #[traced_test]
+    #[tokio::test]
+    async fn it_works_uds() {
+        // nix run nixpkgs#beanstalkd -- -l unix:./beanstalkd.socket
+        let stream = tokio::net::UnixStream::connect("./beanstalkd.socket")
+            .await
+            .unwrap();
+        it_works(stream).await;
     }
 }
